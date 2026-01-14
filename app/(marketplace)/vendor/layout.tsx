@@ -1,0 +1,136 @@
+"use client"
+
+import Link from "next/link"
+import { usePathname, useRouter } from "next/navigation"
+import { useGetMe } from "@/core/account/account"
+import { useSignOut } from "@/core/account/auth"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
+import {
+  Package,
+  ShoppingCart,
+  RotateCcw,
+  Tag,
+  BarChart3,
+  Settings,
+  LogOut,
+  Store,
+} from "lucide-react"
+
+const sidebarLinks = [
+  { href: "/vendor", label: "Dashboard", icon: BarChart3 },
+  { href: "/vendor/products", label: "Products", icon: Package },
+  { href: "/vendor/orders", label: "Orders", icon: ShoppingCart },
+  { href: "/vendor/refunds", label: "Refunds", icon: RotateCcw },
+  { href: "/vendor/promotions", label: "Promotions", icon: Tag },
+  { href: "/vendor/settings", label: "Settings", icon: Settings },
+]
+
+export default function VendorLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const pathname = usePathname()
+  const router = useRouter()
+  const { data: user, isLoading } = useGetMe()
+  const signOut = useSignOut()
+
+  const handleSignOut = async () => {
+    await signOut.mutateAsync()
+    router.push("/")
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex flex-col lg:flex-row gap-8">
+        {/* Sidebar */}
+        <aside className="w-full lg:w-64 flex-shrink-0">
+          {/* Store Info */}
+          <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg mb-4">
+            {isLoading ? (
+              <>
+                <Skeleton className="h-12 w-12 rounded-full" />
+                <div className="space-y-1">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-3 w-32" />
+                </div>
+              </>
+            ) : (
+              <>
+                <Avatar className="h-12 w-12">
+                  <AvatarImage src={user?.avatar_url ?? undefined} />
+                  <AvatarFallback className="bg-primary text-primary-foreground">
+                    <Store className="h-6 w-6" />
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium truncate">
+                      {user?.name || "My Store"}
+                    </p>
+                    <Badge variant="secondary" className="text-xs">Vendor</Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground truncate">
+                    {user?.email || user?.phone}
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Navigation */}
+          <nav className="space-y-1">
+            {sidebarLinks.map(({ href, label, icon: Icon }) => {
+              const isActive = pathname === href ||
+                (href !== "/vendor" && pathname.startsWith(href))
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition-colors",
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {label}
+                </Link>
+              )
+            })}
+
+            <div className="pt-4 border-t mt-4">
+              <Link
+                href="/account"
+                className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              >
+                <Store className="h-4 w-4" />
+                Switch to Buyer
+              </Link>
+            </div>
+
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-3 px-4 py-2.5 h-auto text-sm text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={handleSignOut}
+              disabled={signOut.isPending}
+            >
+              <LogOut className="h-4 w-4" />
+              Sign Out
+            </Button>
+          </nav>
+        </aside>
+
+        {/* Main Content */}
+        <div className="flex-1 min-w-0">
+          {children}
+        </div>
+      </div>
+    </div>
+  )
+}

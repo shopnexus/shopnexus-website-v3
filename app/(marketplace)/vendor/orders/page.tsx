@@ -1,0 +1,278 @@
+"use client"
+
+import { useState } from "react"
+import Link from "next/link"
+import { useListVendorOrders, useConfirmOrder } from "@/core/order/order.vendor"
+import { TOrder, OrderStatus } from "@/core/order/order.customer"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  Search,
+  MoreVertical,
+  Eye,
+  CheckCircle,
+  ShoppingCart,
+  Package,
+  Truck,
+  XCircle,
+  Loader2,
+} from "lucide-react"
+import { formatPrice, cn } from "@/lib/utils"
+
+const statusConfig: Record<OrderStatus, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: React.ElementType }> = {
+  [OrderStatus.Pending]: { label: "Pending", variant: "secondary", icon: ShoppingCart },
+  [OrderStatus.Confirmed]: { label: "Confirmed", variant: "default", icon: CheckCircle },
+  [OrderStatus.Shipped]: { label: "Shipped", variant: "default", icon: Truck },
+  [OrderStatus.Delivered]: { label: "Delivered", variant: "outline", icon: Package },
+  [OrderStatus.Cancelled]: { label: "Cancelled", variant: "destructive", icon: XCircle },
+}
+
+export default function VendorOrdersPage() {
+  const [search, setSearch] = useState("")
+  const [activeTab, setActiveTab] = useState("all")
+  const [confirmOrder, setConfirmOrder] = useState<TOrder | null>(null)
+
+  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useListVendorOrders({
+    limit: 20,
+  })
+  const confirmMutation = useConfirmOrder()
+
+  const orders = data?.pages.flatMap((page) => page.data) ?? []
+
+  const filteredOrders = orders.filter((order) => {
+    const matchesSearch = order.id.toLowerCase().includes(search.toLowerCase())
+    const matchesTab = activeTab === "all" ||
+      (activeTab === "pending" && order.status === OrderStatus.Pending) ||
+      (activeTab === "confirmed" && order.status === OrderStatus.Confirmed) ||
+      (activeTab === "shipped" && order.status === OrderStatus.Shipped) ||
+      (activeTab === "delivered" && order.status === OrderStatus.Delivered)
+    return matchesSearch && matchesTab
+  })
+
+  const handleConfirm = async () => {
+    if (!confirmOrder) return
+    await confirmMutation.mutateAsync({ order_id: confirmOrder.id })
+    setConfirmOrder(null)
+  }
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold">Orders</h1>
+        <p className="text-muted-foreground">Manage and fulfill customer orders</p>
+      </div>
+
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="all">All Orders</TabsTrigger>
+          <TabsTrigger value="pending">Pending</TabsTrigger>
+          <TabsTrigger value="confirmed">Confirmed</TabsTrigger>
+          <TabsTrigger value="shipped">Shipped</TabsTrigger>
+          <TabsTrigger value="delivered">Delivered</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search by order ID..."
+          className="pl-10 max-w-md"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+
+      {/* Orders List */}
+      {isLoading ? (
+        <div className="space-y-4">
+          {[...Array(5)].map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-4">
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <Skeleton className="h-5 w-32" />
+                    <Skeleton className="h-5 w-20" />
+                  </div>
+                  <Skeleton className="h-4 w-48" />
+                  <Skeleton className="h-4 w-24" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : filteredOrders.length === 0 ? (
+        <Card>
+          <CardContent className="p-8 text-center">
+            <ShoppingCart className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No orders found</h3>
+            <p className="text-muted-foreground">
+              {search ? "Try a different search term" : "Orders will appear here when customers make purchases"}
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {filteredOrders.map((order) => {
+            const status = statusConfig[order.status]
+            const StatusIcon = status.icon
+
+            return (
+              <Card key={order.id}>
+                <CardContent className="p-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-medium">Order #{order.id.slice(0, 8)}</h3>
+                        <Badge variant={status.variant} className="gap-1">
+                          <StatusIcon className="h-3 w-3" />
+                          {status.label}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {formatDate(order.date_created)}
+                      </p>
+                      <p className="text-sm">
+                        {order.items.length} item{order.items.length !== 1 ? "s" : ""} •
+                        <span className="font-medium ml-1">{formatPrice(order.total)}</span>
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {order.status === OrderStatus.Pending && (
+                        <Button
+                          size="sm"
+                          onClick={() => setConfirmOrder(order)}
+                        >
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Confirm
+                        </Button>
+                      )}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="icon" className="h-8 w-8">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem asChild>
+                            <Link href={`/vendor/orders/${order.id}`}>
+                              <Eye className="h-4 w-4 mr-2" />
+                              View Details
+                            </Link>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+
+                  {/* Order Items Preview */}
+                  <div className="mt-4 pt-4 border-t">
+                    <div className="flex gap-2 overflow-x-auto pb-2">
+                      {order.items.slice(0, 4).map((item) => (
+                        <div
+                          key={item.id}
+                          className="flex-shrink-0 h-12 w-12 rounded bg-muted flex items-center justify-center"
+                        >
+                          <Package className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                      ))}
+                      {order.items.length > 4 && (
+                        <div className="flex-shrink-0 h-12 w-12 rounded bg-muted flex items-center justify-center text-sm text-muted-foreground">
+                          +{order.items.length - 4}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
+
+          {/* Load More */}
+          {hasNextPage && (
+            <div className="text-center pt-4">
+              <Button
+                variant="outline"
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+              >
+                {isFetchingNextPage ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  "Load More"
+                )}
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Confirm Order Dialog */}
+      <Dialog open={!!confirmOrder} onOpenChange={() => setConfirmOrder(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Order</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to confirm order #{confirmOrder?.id.slice(0, 8)}?
+              This will notify the customer and start the fulfillment process.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmOrder(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirm}
+              disabled={confirmMutation.isPending}
+            >
+              {confirmMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Confirming...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Confirm Order
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}

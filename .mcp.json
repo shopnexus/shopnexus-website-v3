@@ -1,0 +1,45 @@
+{
+  "mcpServers": {
+    "shadcn": {
+      "command": "bunx",
+      "args": [
+        "shadcn@latest",
+        "mcp"
+      ]
+    },
+    "tanstack": {
+      "type": "http",
+      "url": "https://tanstack.com/api/mcp",
+      "headers": {
+        "Authorization": "Bearer ts_4fe6358d67cf20c1ff92f9b1501eb7ad22d3960cb3243da711993d15cb6e8ec8"
+      }
+    },
+    "next-devtools": {
+      "command": "bunx",
+      "args": [
+        "-y",
+        "next-devtools-mcp@latest"
+      ]
+    },
+    "filesystem": {
+      "type": "stdio",
+      "command": "bunx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem"
+      ],
+      "env": {}
+    },
+    "db": {
+      "type": "stdio",
+      "command": "bunx",
+      "args": [
+        "-y",
+        "@bytebase/dbhub",
+        "--dsn",
+        "postgresql://shopnexus:peakshopnexuspassword@localhost:5432/shopnexus"
+      ],
+      "env": {}
+    }
+  }
+}
