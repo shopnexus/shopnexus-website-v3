@@ -1,15 +1,23 @@
 "use client"
 
-import { useState, useEffect, use } from "react"
+import { useState, useEffect, use, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import dynamic from "next/dynamic"
 import { useGetProductSPU, useUpdateProductSPU, useListProductSKU, useCreateProductSKU, useUpdateProductSKU, useDeleteProductSKU, ProductSku } from "@/core/catalog/product.vendor"
 import { useListCategories } from "@/core/catalog/category"
+import type { RichTextEditorRef } from "@/components/ui/rich-text-editor"
+import { ImageUpload, type UploadedImage } from "@/components/ui/image-upload"
+
+// Dynamic import to avoid SSR issues with Quill
+const RichTextEditor = dynamic(
+  () => import("@/components/ui/rich-text-editor").then((mod) => mod.RichTextEditor),
+  { ssr: false, loading: () => <div className="h-[200px] rounded-md border border-input bg-muted/50 animate-pulse" /> }
+)
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -46,6 +54,7 @@ import { formatPrice } from "@/lib/utils"
 export default function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
+  const descriptionRef = useRef<RichTextEditorRef>(null)
 
   const { data: product, isLoading: isLoadingProduct } = useGetProductSPU(id)
   const { data: skus, isLoading: isLoadingSKUs } = useListProductSKU({ spu_id: id })
@@ -67,6 +76,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
     tags: [] as string[],
   })
 
+  const [productImages, setProductImages] = useState<UploadedImage[]>([])
   const [tagInput, setTagInput] = useState("")
   const [specifications, setSpecifications] = useState<Array<{ name: string; value: string }>>([])
   const [showSKUDialog, setShowSKUDialog] = useState(false)
@@ -96,6 +106,10 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         tags: product.tags || [],
       })
       setSpecifications(product.specifications || [])
+      // Load existing images
+      if (product.resources) {
+        setProductImages(product.resources.map(r => ({ id: r.id, url: r.url })))
+      }
     }
   }, [product])
 
@@ -279,13 +293,13 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
 
             <div className="space-y-2">
               <Label htmlFor="description">Description *</Label>
-              <Textarea
-                id="description"
-                placeholder="Describe your product..."
-                className="min-h-[120px]"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                required
+              <RichTextEditor
+                ref={descriptionRef}
+                defaultValue={formData.description}
+                onChange={(html) => setFormData({ ...formData, description: html })}
+                placeholder="Describe your product in detail. Include features, benefits, materials, dimensions, and any other relevant information..."
+                toolbarOptions="full"
+                className="[&_.ql-editor]:min-h-[200px]"
               />
             </div>
 
@@ -339,33 +353,17 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         <Card>
           <CardHeader>
             <CardTitle>Product Images</CardTitle>
-            <CardDescription>Manage product images</CardDescription>
+            <CardDescription>
+              Upload and manage product images. The first image will be the main product image.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {product.resources?.map((resource, index) => (
-                <div key={index} className="relative aspect-square rounded-lg overflow-hidden bg-muted">
-                  <img
-                    src={resource.url}
-                    alt={`Product ${index + 1}`}
-                    className="h-full w-full object-cover"
-                  />
-                  <button
-                    type="button"
-                    className="absolute top-1 right-1 h-6 w-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ))}
-              <button
-                type="button"
-                className="aspect-square rounded-lg border-2 border-dashed border-muted-foreground/25 flex flex-col items-center justify-center gap-2 hover:border-primary hover:bg-muted/50 transition-colors"
-              >
-                <ImagePlus className="h-8 w-8 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">Add Image</span>
-              </button>
-            </div>
+            <ImageUpload
+              value={productImages}
+              onChange={setProductImages}
+              maxFiles={10}
+              maxSizeInMB={5}
+            />
           </CardContent>
         </Card>
 

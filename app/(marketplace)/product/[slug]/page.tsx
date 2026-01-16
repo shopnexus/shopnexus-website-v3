@@ -1,6 +1,6 @@
 "use client"
 
-import { use, useState, useMemo } from "react"
+import { use, useState, useMemo, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import {
@@ -32,8 +32,12 @@ import {
 	RotateCcw,
 	ChevronRight,
 	Check,
+	AlertCircle,
+	Loader2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+
+type SelectedAttributes = Record<string, string>
 
 export default function ProductDetailPage({
 	params,
@@ -46,11 +50,99 @@ export default function ProductDetailPage({
 		useListProductCardsRecommended({ limit: 4 })
 	const updateCart = useUpdateCart()
 
-	const [selectedSkuIndex, setSelectedSkuIndex] = useState(0)
+	const [selectedAttributes, setSelectedAttributes] = useState<SelectedAttributes>({})
 	const [quantity, setQuantity] = useState(1)
 	const [selectedImageIndex, setSelectedImageIndex] = useState(0)
+	const [isAddingToCart, setIsAddingToCart] = useState(false)
+	const [justAdded, setJustAdded] = useState(false)
 
-	const selectedSku = product?.skus?.[selectedSkuIndex]
+	// Extract all unique attribute names and their possible values
+	const attributeOptions = useMemo(() => {
+		if (!product?.skus || product.skus.length === 0) return {}
+
+		const options: Record<string, Set<string>> = {}
+
+		product.skus.forEach((sku) => {
+			sku.attributes?.forEach((attr) => {
+				if (!options[attr.name]) {
+					options[attr.name] = new Set()
+				}
+				options[attr.name].add(attr.value)
+			})
+		})
+
+		// Convert sets to arrays
+		const result: Record<string, string[]> = {}
+		Object.entries(options).forEach(([name, values]) => {
+			result[name] = Array.from(values)
+		})
+
+		return result
+	}, [product?.skus])
+
+	// Get attribute names in order
+	const attributeNames = useMemo(() => Object.keys(attributeOptions), [attributeOptions])
+
+	// Initialize selected attributes when product loads
+	useEffect(() => {
+		if (product?.skus && product.skus.length > 0 && attributeNames.length > 0) {
+			// Initialize with the first SKU's attributes
+			const firstSku = product.skus[0]
+			const initial: SelectedAttributes = {}
+			firstSku.attributes?.forEach((attr) => {
+				initial[attr.name] = attr.value
+			})
+			setSelectedAttributes(initial)
+		}
+	}, [product?.skus, attributeNames])
+
+	// Find the matching SKU based on selected attributes
+	const selectedSku = useMemo(() => {
+		if (!product?.skus || Object.keys(selectedAttributes).length === 0) {
+			return product?.skus?.[0] || null
+		}
+
+		return product.skus.find((sku) => {
+			if (!sku.attributes) return false
+			return sku.attributes.every(
+				(attr) => selectedAttributes[attr.name] === attr.value
+			)
+		}) || null
+	}, [product?.skus, selectedAttributes])
+
+	// Check which values are available for each attribute given current selections
+	const getAvailableValues = (attributeName: string): Set<string> => {
+		if (!product?.skus) return new Set()
+
+		const available = new Set<string>()
+
+		product.skus.forEach((sku) => {
+			if (!sku.attributes) return
+
+			// Check if this SKU matches all OTHER selected attributes
+			const matchesOthers = Object.entries(selectedAttributes).every(([name, value]) => {
+				if (name === attributeName) return true // Skip the current attribute
+				const skuAttr = sku.attributes?.find((a) => a.name === name)
+				return skuAttr?.value === value
+			})
+
+			if (matchesOthers) {
+				const attr = sku.attributes.find((a) => a.name === attributeName)
+				if (attr) {
+					available.add(attr.value)
+				}
+			}
+		})
+
+		return available
+	}
+
+	const handleAttributeSelect = (attributeName: string, value: string) => {
+		setSelectedAttributes((prev) => ({
+			...prev,
+			[attributeName]: value,
+		}))
+	}
 
 	const discount =
 		selectedSku && selectedSku.original_price > selectedSku.price
@@ -61,12 +153,19 @@ export default function ProductDetailPage({
 			  )
 			: 0
 
-	const handleAddToCart = () => {
+	const handleAddToCart = async () => {
 		if (selectedSku) {
-			updateCart.mutate({
-				sku_id: selectedSku.id,
-				delta_quantity: quantity,
-			})
+			setIsAddingToCart(true)
+			try {
+				await updateCart.mutateAsync({
+					sku_id: selectedSku.id,
+					delta_quantity: quantity,
+				})
+				setJustAdded(true)
+				setTimeout(() => setJustAdded(false), 2000)
+			} finally {
+				setIsAddingToCart(false)
+			}
 		}
 	}
 
@@ -88,6 +187,8 @@ export default function ProductDetailPage({
 			</div>
 		)
 	}
+
+	const hasMultipleVariants = product.skus && product.skus.length > 1 && attributeNames.length > 0
 
 	return (
 		<div className="container mx-auto px-4 py-8">
@@ -207,7 +308,7 @@ export default function ProductDetailPage({
 					{/* Price */}
 					<div className="space-y-1">
 						<div className="flex items-center gap-3">
-							<span className="text-3xl font-bold">
+							<span className={cn("text-3xl font-bold", discount > 0 && "text-red-600")}>
 								{selectedSku ? formatPrice(selectedSku.price) : "N/A"}
 							</span>
 							{selectedSku &&
@@ -240,33 +341,84 @@ export default function ProductDetailPage({
 
 					<Separator />
 
-					{/* SKU Selection */}
-					{product.skus && product.skus.length > 1 && (
-						<div className="space-y-3">
-							<p className="font-medium">Select Option:</p>
-							<div className="flex flex-wrap gap-2">
-								{product.skus.map((sku, index) => {
-									const label =
-										sku.attributes?.map((a) => a.value).join(" / ") ||
-										`Option ${index + 1}`
-									return (
-										<Button
-											key={sku.id}
-											variant={
-												selectedSkuIndex === index ? "default" : "outline"
-											}
-											size="sm"
-											onClick={() => setSelectedSkuIndex(index)}
-											className="relative"
-										>
-											{label}
-											{selectedSkuIndex === index && (
-												<Check className="h-3 w-3 ml-1" />
-											)}
-										</Button>
-									)
-								})}
-							</div>
+					{/* Variant Selection */}
+					{hasMultipleVariants && (
+						<div className="space-y-5">
+							{attributeNames.map((attributeName) => {
+								const values = attributeOptions[attributeName]
+								const availableValues = getAvailableValues(attributeName)
+								const selectedValue = selectedAttributes[attributeName]
+
+								return (
+									<div key={attributeName} className="space-y-3">
+										<div className="flex items-center justify-between">
+											<p className="font-medium">
+												{attributeName}:{" "}
+												<span className="text-muted-foreground font-normal">
+													{selectedValue || "Select"}
+												</span>
+											</p>
+										</div>
+										<div className="flex flex-wrap gap-2">
+											{values.map((value) => {
+												const isSelected = selectedValue === value
+												const isAvailable = availableValues.has(value)
+
+												return (
+													<Button
+														key={value}
+														variant={isSelected ? "default" : "outline"}
+														size="sm"
+														onClick={() => handleAttributeSelect(attributeName, value)}
+														disabled={!isAvailable}
+														className={cn(
+															"relative min-w-[60px] transition-all",
+															!isAvailable && "opacity-50 line-through",
+															isSelected && "ring-2 ring-primary ring-offset-2"
+														)}
+													>
+														{value}
+														{isSelected && (
+															<Check className="h-3 w-3 ml-1.5" />
+														)}
+													</Button>
+												)
+											})}
+										</div>
+									</div>
+								)
+							})}
+
+							{/* Selected variant info */}
+							{selectedSku && (
+								<div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-lg p-3">
+									<Check className="h-4 w-4 text-green-600" />
+									<span>
+										Selected: {selectedSku.attributes?.map(a => a.value).join(" / ")}
+									</span>
+									{selectedSku.taken !== undefined && selectedSku.taken > 0 && (
+										<Badge variant="secondary" className="ml-auto">
+											{selectedSku.taken}+ sold
+										</Badge>
+									)}
+								</div>
+							)}
+
+							{!selectedSku && Object.keys(selectedAttributes).length > 0 && (
+								<div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 rounded-lg p-3">
+									<AlertCircle className="h-4 w-4" />
+									<span>This combination is not available</span>
+								</div>
+							)}
+						</div>
+					)}
+
+					{/* Single SKU display */}
+					{!hasMultipleVariants && product.skus && product.skus.length === 1 && (
+						<div className="text-sm text-muted-foreground">
+							{selectedSku?.taken !== undefined && selectedSku.taken > 0 && (
+								<span>{selectedSku.taken}+ sold</span>
+							)}
 						</div>
 					)}
 
@@ -274,10 +426,11 @@ export default function ProductDetailPage({
 					<div className="space-y-3">
 						<p className="font-medium">Quantity:</p>
 						<div className="flex items-center gap-3">
-							<div className="flex items-center">
+							<div className="flex items-center border rounded-lg">
 								<Button
-									variant="outline"
+									variant="ghost"
 									size="icon"
+									className="rounded-r-none"
 									onClick={() => setQuantity(Math.max(1, quantity - 1))}
 									disabled={quantity <= 1}
 								>
@@ -285,18 +438,14 @@ export default function ProductDetailPage({
 								</Button>
 								<span className="w-12 text-center font-medium">{quantity}</span>
 								<Button
-									variant="outline"
+									variant="ghost"
 									size="icon"
+									className="rounded-l-none"
 									onClick={() => setQuantity(quantity + 1)}
 								>
 									<Plus className="h-4 w-4" />
 								</Button>
 							</div>
-							{selectedSku && selectedSku.taken !== undefined && (
-								<span className="text-sm text-muted-foreground">
-									{selectedSku.taken} sold
-								</span>
-							)}
 						</div>
 					</div>
 
@@ -304,12 +453,29 @@ export default function ProductDetailPage({
 					<div className="flex gap-3">
 						<Button
 							size="lg"
-							className="flex-1"
+							className={cn(
+								"flex-1 transition-all",
+								justAdded && "bg-green-600 hover:bg-green-700"
+							)}
 							onClick={handleAddToCart}
-							disabled={updateCart.isPending || !selectedSku}
+							disabled={isAddingToCart || !selectedSku}
 						>
-							<ShoppingCart className="h-5 w-5 mr-2" />
-							Add to Cart
+							{justAdded ? (
+								<>
+									<Check className="h-5 w-5 mr-2" />
+									Added to Cart!
+								</>
+							) : isAddingToCart ? (
+								<>
+									<Loader2 className="h-5 w-5 mr-2 animate-spin" />
+									Adding...
+								</>
+							) : (
+								<>
+									<ShoppingCart className="h-5 w-5 mr-2" />
+									Add to Cart
+								</>
+							)}
 						</Button>
 						<Button size="lg" variant="outline">
 							<Heart className="h-5 w-5" />
@@ -353,7 +519,7 @@ export default function ProductDetailPage({
 				<TabsContent value="description" className="mt-6">
 					<Card>
 						<CardContent className="p-6 prose prose-stone dark:prose-invert max-w-none">
-							<p>{product.description || "No description available."}</p>
+							<div dangerouslySetInnerHTML={{ __html: product.description || "No description available." }} />
 						</CardContent>
 					</Card>
 				</TabsContent>
@@ -446,11 +612,21 @@ function ProductDetailSkeleton() {
 					</div>
 					<Skeleton className="h-10 w-40" />
 					<Skeleton className="h-px w-full" />
-					<div className="space-y-3">
-						<Skeleton className="h-4 w-24" />
+					<div className="space-y-4">
+						<Skeleton className="h-4 w-20" />
 						<div className="flex gap-2">
-							<Skeleton className="h-9 w-20" />
-							<Skeleton className="h-9 w-20" />
+							<Skeleton className="h-9 w-16" />
+							<Skeleton className="h-9 w-16" />
+							<Skeleton className="h-9 w-16" />
+						</div>
+					</div>
+					<div className="space-y-4">
+						<Skeleton className="h-4 w-20" />
+						<div className="flex gap-2">
+							<Skeleton className="h-9 w-12" />
+							<Skeleton className="h-9 w-12" />
+							<Skeleton className="h-9 w-12" />
+							<Skeleton className="h-9 w-12" />
 						</div>
 					</div>
 					<div className="flex gap-3">

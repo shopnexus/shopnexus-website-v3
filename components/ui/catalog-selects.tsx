@@ -1,0 +1,185 @@
+"use client"
+
+import { useState, useMemo, useCallback } from "react"
+import { useListCategories, Category } from "@/core/catalog/category"
+import { useListBrands, Brand } from "@/core/catalog/brand"
+import { useListTags, Tag } from "@/core/catalog/tag"
+import { SearchableSelect, SearchableSelectOption } from "@/components/ui/searchable-select"
+import { useDebounce } from "@/lib/hooks/use-debounce"
+
+// ===== Category Select =====
+
+interface CategorySelectProps {
+	value?: string | null
+	values?: string[]
+	onChange?: (value: string | null) => void
+	onValuesChange?: (values: string[]) => void
+	multiple?: boolean
+	placeholder?: string
+	disabled?: boolean
+	className?: string
+}
+
+export function CategorySelect({
+	value,
+	values,
+	onChange,
+	onValuesChange,
+	multiple = false,
+	placeholder = "Select category",
+	disabled = false,
+	className,
+}: CategorySelectProps) {
+	const [searchQuery, setSearchQuery] = useState("")
+	const debouncedSearch = useDebounce(searchQuery, 300)
+
+	const { data, isLoading } = useListCategories({
+		search: debouncedSearch || undefined,
+		limit: 20,
+	})
+
+	const options: SearchableSelectOption[] = useMemo(() => {
+		const categories = data?.pages.flatMap((page) => page.data) ?? []
+		return categories.map((cat) => ({
+			id: cat.id,
+			label: cat.name,
+			description: cat.description || undefined,
+		}))
+	}, [data])
+
+	return (
+		<SearchableSelect
+			value={value}
+			values={values}
+			onChange={onChange}
+			onValuesChange={onValuesChange}
+			options={options}
+			isLoading={isLoading}
+			searchQuery={searchQuery}
+			onSearchChange={setSearchQuery}
+			placeholder={placeholder}
+			emptyMessage="No categories found."
+			multiple={multiple}
+			disabled={disabled}
+			className={className}
+		/>
+	)
+}
+
+// ===== Brand Select =====
+
+interface BrandSelectProps {
+	value?: string | null
+	values?: string[]
+	onChange?: (value: string | null) => void
+	onValuesChange?: (values: string[]) => void
+	multiple?: boolean
+	placeholder?: string
+	disabled?: boolean
+	className?: string
+}
+
+export function BrandSelect({
+	value,
+	values,
+	onChange,
+	onValuesChange,
+	multiple = false,
+	placeholder = "Select brand",
+	disabled = false,
+	className,
+}: BrandSelectProps) {
+	const [searchQuery, setSearchQuery] = useState("")
+	const debouncedSearch = useDebounce(searchQuery, 300)
+
+	const { data, isLoading } = useListBrands({
+		search: debouncedSearch || undefined,
+		limit: 20,
+	})
+
+	const options: SearchableSelectOption[] = useMemo(() => {
+		const brands = data?.pages.flatMap((page) => page.data) ?? []
+		return brands.map((brand) => ({
+			id: brand.id,
+			label: brand.name,
+			description: brand.code || undefined,
+		}))
+	}, [data])
+
+	return (
+		<SearchableSelect
+			value={value}
+			values={values}
+			onChange={onChange}
+			onValuesChange={onValuesChange}
+			options={options}
+			isLoading={isLoading}
+			searchQuery={searchQuery}
+			onSearchChange={setSearchQuery}
+			placeholder={placeholder}
+			emptyMessage="No brands found."
+			multiple={multiple}
+			disabled={disabled}
+			className={className}
+		/>
+	)
+}
+
+// ===== Tag Select =====
+
+interface TagSelectProps {
+	value?: string | null
+	values?: string[]
+	onChange?: (value: string | null) => void
+	onValuesChange?: (values: string[]) => void
+	multiple?: boolean
+	placeholder?: string
+	disabled?: boolean
+	className?: string
+}
+
+export function TagSelect({
+	value,
+	values,
+	onChange,
+	onValuesChange,
+	multiple = true, // Tags are typically multi-select
+	placeholder = "Select tags",
+	disabled = false,
+	className,
+}: TagSelectProps) {
+	const [searchQuery, setSearchQuery] = useState("")
+	const debouncedSearch = useDebounce(searchQuery, 300)
+
+	const { data, isLoading } = useListTags({
+		search: debouncedSearch || undefined,
+		limit: 20,
+	})
+
+	const options: SearchableSelectOption[] = useMemo(() => {
+		const tags = data?.pages.flatMap((page) => page.data) ?? []
+		return tags.map((tag) => ({
+			id: tag.id,
+			label: tag.id, // Tag id is typically the tag name
+			description: tag.description || undefined,
+		}))
+	}, [data])
+
+	return (
+		<SearchableSelect
+			value={value}
+			values={values}
+			onChange={onChange}
+			onValuesChange={onValuesChange}
+			options={options}
+			isLoading={isLoading}
+			searchQuery={searchQuery}
+			onSearchChange={setSearchQuery}
+			placeholder={placeholder}
+			emptyMessage="No tags found."
+			multiple={multiple}
+			disabled={disabled}
+			className={className}
+		/>
+	)
+}

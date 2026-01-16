@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import {
 	useListProductSPU,
 	useDeleteProductSPU,
@@ -154,12 +155,13 @@ export default function VendorProductsPage() {
 							<CardContent className="p-4">
 								<div className="flex gap-4">
 									{/* Product Image */}
-									<div className="h-20 w-20 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+									<div className="relative h-20 w-20 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
 										{product.resources?.[0] ? (
-											<img
+											<Image
 												src={product.resources[0].url}
 												alt={product.name}
-												className="h-full w-full object-cover rounded-lg"
+												fill
+												className="object-cover rounded-lg"
 											/>
 										) : (
 											<Package className="h-8 w-8 text-muted-foreground" />

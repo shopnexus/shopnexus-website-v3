@@ -1,29 +1,27 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import dynamic from "next/dynamic"
 import { useCreateProductSPU } from "@/core/catalog/product.vendor"
-import { useListCategories } from "@/core/catalog/category"
+import type { RichTextEditorRef } from "@/components/ui/rich-text-editor"
+import { ImageUpload, type UploadedImage } from "@/components/ui/image-upload"
+import { CategorySelect, BrandSelect, TagSelect } from "@/components/ui/catalog-selects"
+
+// Dynamic import to avoid SSR issues with Quill
+const RichTextEditor = dynamic(
+  () => import("@/components/ui/rich-text-editor").then((mod) => mod.RichTextEditor),
+  { ssr: false, loading: () => <div className="h-[200px] rounded-md border border-input bg-muted/50 animate-pulse" /> }
+)
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import { Badge } from "@/components/ui/badge"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import {
   ArrowLeft,
-  Save,
   Loader2,
-  ImagePlus,
   X,
   Plus,
   Package,
@@ -32,9 +30,7 @@ import {
 export default function NewProductPage() {
   const router = useRouter()
   const createProduct = useCreateProductSPU()
-  const { data: categoriesData } = useListCategories({ limit: 100 })
-
-  const categories = categoriesData?.pages.flatMap((page) => page.data) ?? []
+  const descriptionRef = useRef<RichTextEditorRef>(null)
 
   const [formData, setFormData] = useState({
     name: "",
@@ -45,20 +41,9 @@ export default function NewProductPage() {
     tags: [] as string[],
   })
 
-  const [tagInput, setTagInput] = useState("")
+  const [productImages, setProductImages] = useState<UploadedImage[]>([])
 
   const [specifications, setSpecifications] = useState<Array<{ name: string; value: string }>>([])
-
-  const handleAddTag = () => {
-    if (tagInput.trim() && !formData.tags.includes(tagInput.trim())) {
-      setFormData({ ...formData, tags: [...formData.tags, tagInput.trim()] })
-      setTagInput("")
-    }
-  }
-
-  const handleRemoveTag = (tag: string) => {
-    setFormData({ ...formData, tags: formData.tags.filter((t) => t !== tag) })
-  }
 
   const handleAddSpec = () => {
     setSpecifications([...specifications, { name: "", value: "" }])
@@ -119,43 +104,32 @@ export default function NewProductPage() {
 
             <div className="space-y-2">
               <Label htmlFor="description">Description *</Label>
-              <Textarea
-                id="description"
-                placeholder="Describe your product..."
-                className="min-h-[120px]"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                required
+              <RichTextEditor
+                ref={descriptionRef}
+                defaultValue={formData.description}
+                onChange={(html) => setFormData({ ...formData, description: html })}
+                placeholder="Describe your product in detail. Include features, benefits, materials, dimensions, and any other relevant information..."
+                toolbarOptions="full"
+                className="[&_.ql-editor]:min-h-[200px]"
               />
             </div>
 
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="category">Category *</Label>
-                <Select
-                  value={formData.category_id}
-                  onValueChange={(value) => setFormData({ ...formData, category_id: value })}
-                >
-                  <SelectTrigger id="category">
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((category) => (
-                      <SelectItem key={category.id} value={category.id}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Category *</Label>
+                <CategorySelect
+                  value={formData.category_id || null}
+                  onChange={(value) => setFormData({ ...formData, category_id: value || "" })}
+                  placeholder="Search categories..."
+                />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="brand">Brand</Label>
-                <Input
-                  id="brand"
-                  placeholder="Enter brand name"
-                  value={formData.brand_id}
-                  onChange={(e) => setFormData({ ...formData, brand_id: e.target.value })}
+                <Label>Brand</Label>
+                <BrandSelect
+                  value={formData.brand_id || null}
+                  onChange={(value) => setFormData({ ...formData, brand_id: value || "" })}
+                  placeholder="Search brands..."
                 />
               </div>
             </div>
@@ -179,21 +153,17 @@ export default function NewProductPage() {
         <Card>
           <CardHeader>
             <CardTitle>Product Images</CardTitle>
-            <CardDescription>Upload images of your product</CardDescription>
+            <CardDescription>
+              Upload images of your product. The first image will be the main product image.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <button
-                type="button"
-                className="aspect-square rounded-lg border-2 border-dashed border-muted-foreground/25 flex flex-col items-center justify-center gap-2 hover:border-primary hover:bg-muted/50 transition-colors"
-              >
-                <ImagePlus className="h-8 w-8 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">Add Image</span>
-              </button>
-            </div>
-            <p className="text-xs text-muted-foreground mt-4">
-              Recommended: 1000x1000px, max 5MB per image. First image will be the main product image.
-            </p>
+            <ImageUpload
+              value={productImages}
+              onChange={setProductImages}
+              maxFiles={10}
+              maxSizeInMB={5}
+            />
           </CardContent>
         </Card>
 
@@ -203,40 +173,13 @@ export default function NewProductPage() {
             <CardTitle>Tags</CardTitle>
             <CardDescription>Add tags to help customers find your product</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex gap-2">
-              <Input
-                placeholder="Add a tag..."
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault()
-                    handleAddTag()
-                  }
-                }}
-              />
-              <Button type="button" variant="outline" onClick={handleAddTag}>
-                Add
-              </Button>
-            </div>
-
-            {formData.tags.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {formData.tags.map((tag) => (
-                  <Badge key={tag} variant="secondary" className="gap-1">
-                    {tag}
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveTag(tag)}
-                      className="ml-1 hover:text-destructive"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-            )}
+          <CardContent>
+            <TagSelect
+              values={formData.tags}
+              onValuesChange={(values) => setFormData({ ...formData, tags: values })}
+              placeholder="Search and select tags..."
+              multiple
+            />
           </CardContent>
         </Card>
 

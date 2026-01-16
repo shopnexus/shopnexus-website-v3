@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { useListRefundsVendor, useConfirmRefundVendor, useCancelRefundVendor, TRefund, RefundMethod } from "@/core/order/refund.vendor"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -205,12 +206,13 @@ export default function VendorRefundsPage() {
                           {refund.resources.slice(0, 3).map((resource, idx) => (
                             <div
                               key={idx}
-                              className="h-12 w-12 rounded bg-muted flex items-center justify-center overflow-hidden"
+                              className="relative h-12 w-12 rounded bg-muted flex items-center justify-center overflow-hidden"
                             >
-                              <img
+                              <Image
                                 src={resource.url}
                                 alt="Evidence"
-                                className="h-full w-full object-cover"
+                                fill
+                                className="object-cover"
                               />
                             </div>
                           ))}
