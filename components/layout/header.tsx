@@ -18,6 +18,7 @@ import { useGetCart } from "@/core/order/cart"
 import { useGetMe } from "@/core/account/account"
 import { useSignOut } from "@/core/account/auth"
 import { CartSheet } from "@/components/cart/cart-sheet"
+import { ThemeToggle } from "@/components/layout/theme-toggle"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 
@@ -156,6 +157,9 @@ export function Header() {
 								<span className="sr-only">Wishlist</span>
 							</Link>
 						</Button>
+
+						{/* Theme Toggle */}
+						<ThemeToggle />
 
 						{/* Cart */}
 						<Sheet open={isCartOpen} onOpenChange={setIsCartOpen}>

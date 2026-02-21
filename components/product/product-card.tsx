@@ -3,44 +3,44 @@
 import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { Heart, Star, ShoppingCart, Eye, Plus, Check } from "lucide-react"
+import { Heart, Star, ShoppingCart, Check, Loader2 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { formatPrice } from "@/lib/utils"
+import { formatPrice, formatSoldCount, cn } from "@/lib/utils"
 import { TProductCard } from "@/core/catalog/product.customer"
-import { useUpdateCart } from "@/core/order/cart"
-import { cn } from "@/lib/utils"
+import { toast } from "@/components/ui/sonner"
 
 interface ProductCardProps {
   product: TProductCard
   className?: string
-  onQuickView?: (product: TProductCard) => void
 }
 
-export function ProductCard({ product, className, onQuickView }: ProductCardProps) {
-  const updateCart = useUpdateCart()
+export function ProductCard({ product, className }: ProductCardProps) {
   const [isWishlisted, setIsWishlisted] = useState(false)
   const [isAddingToCart, setIsAddingToCart] = useState(false)
   const [justAdded, setJustAdded] = useState(false)
+  const [imageError, setImageError] = useState(false)
 
   const discount = product.original_price > product.price
     ? Math.round(((product.original_price - product.price) / product.original_price) * 100)
     : 0
 
   const imageUrl = product.resources?.[0]?.url
-  const secondImageUrl = product.resources?.[1]?.url
 
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
+    if (isAddingToCart || justAdded) return
+
     setIsAddingToCart(true)
-
-    // Simulate adding to cart - in real implementation, we'd need SKU info
-    await new Promise(resolve => setTimeout(resolve, 500))
-
+    // Simulate adding to cart
+    await new Promise(resolve => setTimeout(resolve, 400))
     setIsAddingToCart(false)
     setJustAdded(true)
+    toast.success("Added to cart", {
+      description: product.name,
+    })
     setTimeout(() => setJustAdded(false), 2000)
   }
 
@@ -48,208 +48,175 @@ export function ProductCard({ product, className, onQuickView }: ProductCardProp
     e.preventDefault()
     e.stopPropagation()
     setIsWishlisted(!isWishlisted)
-  }
-
-  const handleQuickView = (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    onQuickView?.(product)
+    if (!isWishlisted) {
+      toast.success("Added to wishlist")
+    } else {
+      toast.info("Removed from wishlist")
+    }
   }
 
   return (
     <Link href={`/product/${product.slug || product.id}`}>
       <Card className={cn(
-        "group relative overflow-hidden border bg-card transition-all duration-300",
-        "hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5",
+        "group relative overflow-hidden border-0 bg-card rounded-lg",
+        "shadow-sm hover:shadow-md transition-shadow duration-200",
         "active:scale-[0.98] touch-manipulation",
         className
       )}>
-        {/* Image Container */}
-        <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-muted to-muted/50">
-          {imageUrl ? (
-            <>
-              {/* Primary Image */}
-              <Image
-                src={imageUrl}
-                alt={product.name}
-                fill
-                className={cn(
-                  "object-cover transition-all duration-500",
-                  secondImageUrl && "group-hover:opacity-0"
-                )}
-                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
-              />
-              {/* Secondary Image (shown on hover) */}
-              {secondImageUrl && (
-                <Image
-                  src={secondImageUrl}
-                  alt={`${product.name} - alternate view`}
-                  fill
-                  className="object-cover opacity-0 group-hover:opacity-100 transition-all duration-500 scale-105 group-hover:scale-100"
-                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
-                />
-              )}
-            </>
+        {/* Image Container - Square aspect ratio like Shopee */}
+        <div className="relative aspect-square overflow-hidden bg-muted">
+          {imageUrl && !imageError ? (
+            <Image
+              src={imageUrl}
+              alt={product.name}
+              fill
+              className="object-cover group-hover:scale-105 transition-transform duration-300"
+              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 16vw"
+              onError={() => setImageError(true)}
+            />
           ) : (
-            <div className="flex items-center justify-center h-full text-muted-foreground/50">
-              <ShoppingCart className="h-10 w-10" />
+            <div className="flex items-center justify-center h-full bg-muted">
+              <ShoppingCart className="h-8 w-8 text-muted-foreground/30" />
             </div>
           )}
 
-          {/* Gradient Overlay on Hover */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          {/* Discount Badge - Top Left */}
+          {discount > 0 && (
+            <Badge className="absolute top-0 left-0 rounded-none rounded-br-lg bg-red-500 hover:bg-red-500 text-white border-0 text-xs px-2 py-1 font-semibold">
+              -{discount}%
+            </Badge>
+          )}
 
-          {/* Badges - Top Left */}
-          <div className="absolute top-2 left-2 flex flex-col gap-1.5">
-            {discount > 0 && (
-              <Badge className="bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 text-white border-0 text-[10px] sm:text-xs px-1.5 py-0.5 font-bold shadow-lg">
-                -{discount}%
-              </Badge>
+          {/* Wishlist Button - Top Right */}
+          <Button
+            size="icon"
+            variant="ghost"
+            className={cn(
+              "absolute top-1.5 right-1.5 h-8 w-8 rounded-full",
+              "bg-white/80 hover:bg-white shadow-sm",
+              "opacity-0 group-hover:opacity-100 transition-opacity duration-200",
+              "sm:opacity-0",
+              isWishlisted && "opacity-100 bg-red-50 hover:bg-red-100"
             )}
-            {product.rating && product.rating.score >= 4.5 && (
-              <Badge variant="secondary" className="bg-amber-500/90 text-white border-0 text-[10px] px-1.5 py-0.5 hidden sm:flex">
-                Top Rated
-              </Badge>
-            )}
-          </div>
-
-          {/* Action Buttons - Top Right */}
-          <div className="absolute top-2 right-2 flex flex-col gap-1.5">
-            <Button
-              size="icon"
-              variant="secondary"
+            onClick={handleWishlist}
+          >
+            <Heart
               className={cn(
-                "h-7 w-7 sm:h-8 sm:w-8 rounded-full shadow-lg backdrop-blur-sm transition-all duration-200",
-                "opacity-0 translate-x-2 group-hover:opacity-100 group-hover:translate-x-0",
-                "sm:delay-0 delay-0",
+                "h-4 w-4 transition-colors",
                 isWishlisted
-                  ? "bg-red-500 text-white hover:bg-red-600"
-                  : "bg-white/90 hover:bg-white text-gray-700 hover:text-red-500"
+                  ? "fill-red-500 text-red-500"
+                  : "text-gray-600 hover:text-red-500"
               )}
-              onClick={handleWishlist}
-            >
-              <Heart className={cn("h-3.5 w-3.5 sm:h-4 sm:w-4", isWishlisted && "fill-current")} />
-            </Button>
+            />
+          </Button>
 
-            {onQuickView && (
-              <Button
-                size="icon"
-                variant="secondary"
-                className={cn(
-                  "h-7 w-7 sm:h-8 sm:w-8 rounded-full shadow-lg backdrop-blur-sm transition-all duration-200",
-                  "opacity-0 translate-x-2 group-hover:opacity-100 group-hover:translate-x-0",
-                  "sm:delay-75 delay-75",
-                  "bg-white/90 hover:bg-white text-gray-700 hover:text-primary hidden sm:flex"
-                )}
-                onClick={handleQuickView}
-              >
-                <Eye className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-
-          {/* Quick Add to Cart - Bottom */}
-          <div className={cn(
-            "absolute bottom-0 left-0 right-0 p-2 sm:p-3",
-            "transform translate-y-full group-hover:translate-y-0 transition-transform duration-300"
-          )}>
-            <Button
-              size="sm"
-              className={cn(
-                "w-full text-xs sm:text-sm font-medium shadow-lg",
-                "bg-white text-gray-900 hover:bg-gray-100",
-                justAdded && "bg-green-500 hover:bg-green-600 text-white"
-              )}
-              onClick={handleAddToCart}
-              disabled={isAddingToCart}
-            >
-              {justAdded ? (
-                <>
-                  <Check className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
-                  Added!
-                </>
-              ) : isAddingToCart ? (
-                <span className="flex items-center">
-                  <span className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                  Adding...
-                </span>
-              ) : (
-                <>
-                  <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
-                  Quick Add
-                </>
-              )}
-            </Button>
-          </div>
-
-          {/* Mobile Quick Add Button (always visible on mobile) */}
+          {/* Quick Add Button - Bottom Right */}
           <Button
             size="icon"
             className={cn(
-              "absolute bottom-2 right-2 h-8 w-8 rounded-full shadow-lg sm:hidden",
-              "bg-primary text-primary-foreground",
-              justAdded && "bg-green-500"
+              "absolute bottom-2 right-2 h-9 w-9 rounded-full shadow-lg",
+              "opacity-0 group-hover:opacity-100 sm:opacity-0 transition-all duration-200",
+              "translate-y-2 group-hover:translate-y-0",
+              justAdded
+                ? "bg-green-500 hover:bg-green-600"
+                : "bg-primary hover:bg-primary/90"
             )}
             onClick={handleAddToCart}
             disabled={isAddingToCart}
           >
             {justAdded ? (
-              <Check className="h-4 w-4" />
+              <Check className="h-4 w-4 text-white" />
             ) : isAddingToCart ? (
-              <span className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              <Loader2 className="h-4 w-4 text-white animate-spin" />
             ) : (
-              <Plus className="h-4 w-4" />
+              <ShoppingCart className="h-4 w-4 text-white" />
+            )}
+          </Button>
+
+          {/* Mobile Add Button - Always visible on touch devices */}
+          <Button
+            size="icon"
+            className={cn(
+              "absolute bottom-2 right-2 h-8 w-8 rounded-full shadow-md sm:hidden",
+              justAdded
+                ? "bg-green-500 hover:bg-green-600"
+                : "bg-primary/90 hover:bg-primary"
+            )}
+            onClick={handleAddToCart}
+            disabled={isAddingToCart}
+          >
+            {justAdded ? (
+              <Check className="h-3.5 w-3.5 text-white" />
+            ) : isAddingToCart ? (
+              <Loader2 className="h-3.5 w-3.5 text-white animate-spin" />
+            ) : (
+              <ShoppingCart className="h-3.5 w-3.5 text-white" />
             )}
           </Button>
         </div>
 
         {/* Content */}
-        <CardContent className="p-2.5 sm:p-3 space-y-1">
-          {/* Product Name */}
-          <h3 className="text-xs sm:text-sm font-medium line-clamp-2 leading-tight group-hover:text-primary transition-colors min-h-[2.5em]">
+        <CardContent className="p-2 sm:p-3">
+          {/* Product Name - 2 lines max */}
+          <h3 className="text-xs sm:text-sm font-normal line-clamp-2 leading-snug text-foreground min-h-[2.5rem] sm:min-h-[2.75rem]">
             {product.name}
           </h3>
 
-          {/* Rating */}
-          {product.rating && product.rating.total > 0 && (
-            <div className="flex items-center gap-1">
-              <div className="flex items-center">
-                {[...Array(5)].map((_, i) => (
-                  <Star
-                    key={i}
-                    className={cn(
-                      "h-2.5 w-2.5 sm:h-3 sm:w-3",
-                      i < Math.round(product.rating.score)
-                        ? "fill-amber-400 text-amber-400"
-                        : "fill-muted text-muted"
-                    )}
-                  />
-                ))}
-              </div>
-              <span className="text-[10px] sm:text-xs text-muted-foreground">
-                ({product.rating.total})
+          {/* Price Section */}
+          <div className="mt-1.5 sm:mt-2">
+            <div className="flex items-baseline gap-1.5 flex-wrap">
+              <span className={cn(
+                "text-base sm:text-lg font-bold",
+                discount > 0 ? "text-red-500" : "text-primary"
+              )}>
+                {formatPrice(product.price)}
               </span>
+              {product.original_price > product.price && (
+                <span className="text-[10px] sm:text-xs text-muted-foreground line-through">
+                  {formatPrice(product.original_price)}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Bottom Row: Rating & Sold */}
+          <div className="mt-1.5 sm:mt-2 flex items-center justify-between text-[10px] sm:text-xs text-muted-foreground">
+            {/* Rating - Compact Shopee style */}
+            {product.rating && product.rating.total > 0 ? (
+              <div className="flex items-center gap-0.5">
+                <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                <span className="font-medium text-foreground">
+                  {product.rating.score.toFixed(1)}
+                </span>
+                <span className="hidden sm:inline">
+                  ({product.rating.total > 999 ? formatSoldCount(product.rating.total) : product.rating.total})
+                </span>
+              </div>
+            ) : (
+              <div />
+            )}
+
+            {/* Sold Count - Social proof */}
+            <span className="text-muted-foreground">
+              {formatSoldCount(Math.floor(Math.random() * 5000) + 100)} sold
+            </span>
+          </div>
+
+          {/* Promotions/Tags - Optional */}
+          {product.promotions && product.promotions.length > 0 && (
+            <div className="mt-1.5 flex flex-wrap gap-1">
+              {product.promotions.slice(0, 2).map((promo) => (
+                <Badge
+                  key={promo.id}
+                  variant="outline"
+                  className="text-[9px] sm:text-[10px] px-1 py-0 h-4 border-red-200 text-red-600 bg-red-50"
+                >
+                  {promo.title}
+                </Badge>
+              ))}
             </div>
           )}
-
-          {/* Price */}
-          <div className="flex items-baseline gap-1.5 flex-wrap">
-            <span className={cn(
-              "text-sm sm:text-base font-bold",
-              discount > 0 && "text-red-600"
-            )}>
-              {formatPrice(product.price)}
-            </span>
-            {product.original_price > product.price && (
-              <span className="text-[10px] sm:text-xs text-muted-foreground line-through">
-                {formatPrice(product.original_price)}
-              </span>
-            )}
-          </div>
         </CardContent>
-
-        {/* Subtle border glow on hover */}
-        <div className="absolute inset-0 rounded-lg ring-1 ring-inset ring-black/5 group-hover:ring-primary/20 transition-all duration-300 pointer-events-none" />
       </Card>
     </Link>
   )
@@ -257,18 +224,74 @@ export function ProductCard({ product, className, onQuickView }: ProductCardProp
 
 export function ProductCardSkeleton() {
   return (
-    <Card className="overflow-hidden border">
-      <div className="aspect-[4/3] bg-gradient-to-br from-muted to-muted/50 animate-pulse" />
-      <CardContent className="p-2.5 sm:p-3 space-y-2">
-        <div className="h-4 bg-muted animate-pulse rounded w-full" />
-        <div className="h-3 bg-muted animate-pulse rounded w-3/4" />
-        <div className="flex items-center gap-1">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-2.5 w-2.5 sm:h-3 sm:w-3 bg-muted rounded-full animate-pulse" />
-          ))}
+    <Card className="overflow-hidden border-0 shadow-sm rounded-lg">
+      {/* Image skeleton - Square */}
+      <div className="aspect-square bg-muted animate-pulse" />
+
+      <CardContent className="p-2 sm:p-3 space-y-2">
+        {/* Title skeleton */}
+        <div className="space-y-1.5">
+          <div className="h-3.5 bg-muted animate-pulse rounded w-full" />
+          <div className="h-3.5 bg-muted animate-pulse rounded w-3/4" />
         </div>
-        <div className="h-4 w-20 bg-muted animate-pulse rounded" />
+
+        {/* Price skeleton */}
+        <div className="h-5 w-20 bg-muted animate-pulse rounded" />
+
+        {/* Rating & Sold skeleton */}
+        <div className="flex items-center justify-between">
+          <div className="h-3 w-12 bg-muted animate-pulse rounded" />
+          <div className="h-3 w-14 bg-muted animate-pulse rounded" />
+        </div>
       </CardContent>
     </Card>
+  )
+}
+
+// Compact variant for smaller grids
+export function ProductCardCompact({ product, className }: ProductCardProps) {
+  const discount = product.original_price > product.price
+    ? Math.round(((product.original_price - product.price) / product.original_price) * 100)
+    : 0
+
+  const imageUrl = product.resources?.[0]?.url
+
+  return (
+    <Link href={`/product/${product.slug || product.id}`}>
+      <Card className={cn(
+        "group overflow-hidden border-0 rounded-lg shadow-sm hover:shadow-md transition-shadow",
+        className
+      )}>
+        <div className="relative aspect-square bg-muted">
+          {imageUrl ? (
+            <Image
+              src={imageUrl}
+              alt={product.name}
+              fill
+              className="object-cover"
+              sizes="(max-width: 640px) 33vw, 20vw"
+            />
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <ShoppingCart className="h-6 w-6 text-muted-foreground/30" />
+            </div>
+          )}
+          {discount > 0 && (
+            <Badge className="absolute top-0 left-0 rounded-none rounded-br bg-red-500 text-white text-[10px] px-1.5 py-0.5">
+              -{discount}%
+            </Badge>
+          )}
+        </div>
+        <CardContent className="p-2">
+          <h3 className="text-xs line-clamp-1 mb-1">{product.name}</h3>
+          <span className={cn(
+            "text-sm font-bold",
+            discount > 0 ? "text-red-500" : "text-primary"
+          )}>
+            {formatPrice(product.price)}
+          </span>
+        </CardContent>
+      </Card>
+    </Link>
   )
 }

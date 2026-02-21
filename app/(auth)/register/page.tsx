@@ -1,71 +1,74 @@
 "use client"
 
-import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
 import { useRegisterBasic } from "@/core/account/auth"
+import { registerSchema, RegisterFormData } from "@/lib/validations"
+import { toast } from "@/components/ui/sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Eye, EyeOff, Loader2, Mail, Lock, User, Check } from "lucide-react"
+import { useState } from "react"
 import { cn } from "@/lib/utils"
 
 export default function RegisterPage() {
   const router = useRouter()
-  const register = useRegisterBasic()
-
+  const registerMutation = useRegisterBasic()
   const [showPassword, setShowPassword] = useState(false)
-  const [formData, setFormData] = useState({
-    email: "",
-    username: "",
-    password: "",
-    confirmPassword: "",
-  })
-  const [error, setError] = useState("")
   const [agreedToTerms, setAgreedToTerms] = useState(false)
 
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm<RegisterFormData>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      phone: "",
+      password: "",
+      confirmPassword: "",
+    },
+  })
+
+  const password = watch("password")
+
   const passwordRequirements = [
-    { label: "At least 8 characters", met: formData.password.length >= 8 },
-    { label: "Contains a number", met: /\d/.test(formData.password) },
-    { label: "Contains uppercase", met: /[A-Z]/.test(formData.password) },
+    { label: "At least 8 characters", met: password?.length >= 8 },
+    // { label: "Contains a number", met: /\d/.test(password || "") },
+    // { label: "Contains uppercase", met: /[A-Z]/.test(password || "") },
+    // { label: "Contains lowercase", met: /[a-z]/.test(password || "") },
   ]
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError("")
-
-    if (!formData.email || !formData.password) {
-      setError("Please fill in all required fields")
-      return
-    }
-
-    if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match")
-      return
-    }
-
-    if (!passwordRequirements.every(r => r.met)) {
-      setError("Password does not meet requirements")
-      return
-    }
-
+  const onSubmit = async (data: RegisterFormData) => {
     if (!agreedToTerms) {
-      setError("Please agree to the terms and conditions")
+      toast.error("Please agree to the terms and conditions")
       return
     }
 
     try {
-      await register.mutateAsync({
+      await registerMutation.mutateAsync({
         type: "Customer",
-        email: formData.email,
-        username: formData.username || null,
-        password: formData.password,
+        email: data.email,
+        username: data.name || null,
+        password: data.password,
+      })
+      toast.success("Account created!", {
+        description: "Welcome to ShopNexus. You can now start shopping.",
       })
       router.push("/")
     } catch (err) {
-      setError("Registration failed. This email may already be in use.")
+      toast.error("Registration failed", {
+        description: "This email may already be in use. Please try again.",
+      })
     }
   }
 
@@ -78,13 +81,25 @@ export default function RegisterPage() {
         </CardDescription>
       </CardHeader>
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit(onSubmit)}>
         <CardContent className="space-y-4">
-          {error && (
-            <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-lg">
-              {error}
+          <div className="space-y-2">
+            <Label htmlFor="name">Full Name *</Label>
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                id="name"
+                type="text"
+                placeholder="Enter your full name"
+                className={`pl-10 ${errors.name ? "border-destructive" : ""}`}
+                disabled={isSubmitting || registerMutation.isPending}
+                {...register("name")}
+              />
             </div>
-          )}
+            {errors.name && (
+              <p className="text-sm text-destructive">{errors.name.message}</p>
+            )}
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor="email">Email *</Label>
@@ -94,29 +109,14 @@ export default function RegisterPage() {
                 id="email"
                 type="email"
                 placeholder="Enter your email"
-                className="pl-10"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                disabled={register.isPending}
-                required
+                className={`pl-10 ${errors.email ? "border-destructive" : ""}`}
+                disabled={isSubmitting || registerMutation.isPending}
+                {...register("email")}
               />
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="username">Username (optional)</Label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="username"
-                type="text"
-                placeholder="Choose a username"
-                className="pl-10"
-                value={formData.username}
-                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                disabled={register.isPending}
-              />
-            </div>
+            {errors.email && (
+              <p className="text-sm text-destructive">{errors.email.message}</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -127,11 +127,9 @@ export default function RegisterPage() {
                 id="password"
                 type={showPassword ? "text" : "password"}
                 placeholder="Create a password"
-                className="pl-10 pr-10"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                disabled={register.isPending}
-                required
+                className={`pl-10 pr-10 ${errors.password ? "border-destructive" : ""}`}
+                disabled={isSubmitting || registerMutation.isPending}
+                {...register("password")}
               />
               <button
                 type="button"
@@ -145,7 +143,10 @@ export default function RegisterPage() {
                 )}
               </button>
             </div>
-            {formData.password && (
+            {errors.password && (
+              <p className="text-sm text-destructive">{errors.password.message}</p>
+            )}
+            {password && (
               <div className="space-y-1 mt-2">
                 {passwordRequirements.map((req) => (
                   <div
@@ -171,27 +172,27 @@ export default function RegisterPage() {
                 id="confirmPassword"
                 type={showPassword ? "text" : "password"}
                 placeholder="Confirm your password"
-                className="pl-10"
-                value={formData.confirmPassword}
-                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                disabled={register.isPending}
-                required
+                className={`pl-10 ${errors.confirmPassword ? "border-destructive" : ""}`}
+                disabled={isSubmitting || registerMutation.isPending}
+                {...register("confirmPassword")}
               />
             </div>
-            {formData.confirmPassword && formData.password !== formData.confirmPassword && (
-              <p className="text-xs text-destructive">Passwords do not match</p>
+            {errors.confirmPassword && (
+              <p className="text-sm text-destructive">{errors.confirmPassword.message}</p>
             )}
           </div>
 
-          <label className="flex items-start gap-2 cursor-pointer">
-            <input
-              type="checkbox"
+          <div className="flex items-start space-x-2">
+            <Checkbox
+              id="terms"
               checked={agreedToTerms}
-              onChange={(e) => setAgreedToTerms(e.target.checked)}
-              className="mt-1 rounded"
-              disabled={register.isPending}
+              onCheckedChange={(checked) => setAgreedToTerms(checked as boolean)}
+              disabled={isSubmitting || registerMutation.isPending}
             />
-            <span className="text-sm text-muted-foreground">
+            <label
+              htmlFor="terms"
+              className="text-sm text-muted-foreground leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
               I agree to the{" "}
               <Link href="/terms" className="text-primary hover:underline">
                 Terms of Service
@@ -200,11 +201,15 @@ export default function RegisterPage() {
               <Link href="/privacy" className="text-primary hover:underline">
                 Privacy Policy
               </Link>
-            </span>
-          </label>
+            </label>
+          </div>
 
-          <Button type="submit" className="w-full" disabled={register.isPending}>
-            {register.isPending ? (
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={isSubmitting || registerMutation.isPending}
+          >
+            {isSubmitting || registerMutation.isPending ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 Creating account...
@@ -226,7 +231,7 @@ export default function RegisterPage() {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <Button variant="outline" type="button" disabled={register.isPending}>
+            <Button variant="outline" type="button" disabled={isSubmitting || registerMutation.isPending}>
               <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24">
                 <path
                   fill="currentColor"
@@ -247,7 +252,7 @@ export default function RegisterPage() {
               </svg>
               Google
             </Button>
-            <Button variant="outline" type="button" disabled={register.isPending}>
+            <Button variant="outline" type="button" disabled={isSubmitting || registerMutation.isPending}>
               <svg className="h-4 w-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
               </svg>

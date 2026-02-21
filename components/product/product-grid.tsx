@@ -11,7 +11,6 @@ interface ProductGridProps {
   isFetchingNextPage?: boolean
   hasNextPage?: boolean
   onLoadMore?: () => void
-  onQuickView?: (product: TProductCard) => void
   skeletonCount?: number
 }
 
@@ -21,7 +20,6 @@ export function ProductGrid({
   isFetchingNextPage,
   hasNextPage,
   onLoadMore,
-  onQuickView,
   skeletonCount = 8,
 }: ProductGridProps) {
   if (isLoading) {
@@ -49,7 +47,6 @@ export function ProductGrid({
           <ProductCard
             key={product.id}
             product={product}
-            onQuickView={onQuickView}
           />
         ))}
       </div>

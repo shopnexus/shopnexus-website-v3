@@ -19,3 +19,11 @@ export function formatDate(date: string | Date): string {
     day: "numeric",
   }).format(new Date(date));
 }
+
+// Format sold count (e.g., 1200 -> "1.2k")
+export function formatSoldCount(count: number): string {
+  if (count >= 1000) {
+    return `${(count / 1000).toFixed(1).replace(/\.0$/, '')}k`;
+  }
+  return count.toString();
+}

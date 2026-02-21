@@ -9,6 +9,8 @@ import { useGetCart, useUpdateCart, useClearCart } from "@/core/order/cart"
 import { formatPrice } from "@/lib/utils"
 import Image from "next/image"
 import Link from "next/link"
+import { toast } from "@/components/ui/sonner"
+import { CartItemSkeleton } from "@/components/skeletons"
 
 interface CartSheetProps {
   onClose: () => void
@@ -23,11 +25,31 @@ export function CartSheet({ onClose }: CartSheetProps) {
   const itemCount = cart?.reduce((acc, item) => acc + item.quantity, 0) ?? 0
 
   const handleUpdateQuantity = (skuId: string, delta: number) => {
-    updateCart.mutate({ sku_id: skuId, delta_quantity: delta })
+    updateCart.mutate(
+      { sku_id: skuId, delta_quantity: delta },
+      {
+        onSuccess: () => {
+          toast.success(delta > 0 ? "Item quantity increased" : "Item quantity decreased")
+        },
+        onError: () => {
+          toast.error("Failed to update quantity")
+        },
+      }
+    )
   }
 
   const handleRemoveItem = (skuId: string) => {
-    updateCart.mutate({ sku_id: skuId, quantity: 0 })
+    updateCart.mutate(
+      { sku_id: skuId, quantity: 0 },
+      {
+        onSuccess: () => {
+          toast.success("Item removed from cart")
+        },
+        onError: () => {
+          toast.error("Failed to remove item")
+        },
+      }
+    )
   }
 
   return (
@@ -40,8 +62,10 @@ export function CartSheet({ onClose }: CartSheetProps) {
       </SheetHeader>
 
       {isLoading ? (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="animate-pulse text-muted-foreground">Loading...</div>
+        <div className="flex-1 space-y-4 py-4">
+          <CartItemSkeleton />
+          <CartItemSkeleton />
+          <CartItemSkeleton />
         </div>
       ) : !cart || cart.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-4">
@@ -139,7 +163,10 @@ export function CartSheet({ onClose }: CartSheetProps) {
               variant="ghost"
               size="sm"
               className="w-full text-destructive hover:text-destructive"
-              onClick={() => clearCart.mutate()}
+              onClick={() => clearCart.mutate(undefined, {
+                onSuccess: () => toast.success("Cart cleared"),
+                onError: () => toast.error("Failed to clear cart"),
+              })}
               disabled={clearCart.isPending}
             >
               Clear Cart

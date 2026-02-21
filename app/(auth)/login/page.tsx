@@ -1,44 +1,51 @@
 "use client"
 
-import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
 import { useLoginBasic } from "@/core/account/auth"
+import { loginSchema, LoginFormData } from "@/lib/validations"
+import { toast } from "@/components/ui/sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Eye, EyeOff, Loader2, Mail, Lock } from "lucide-react"
+import { useState } from "react"
 
 export default function LoginPage() {
   const router = useRouter()
   const login = useLoginBasic()
-
   const [showPassword, setShowPassword] = useState(false)
-  const [formData, setFormData] = useState({
-    id: "",
-    password: "",
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      id: "",
+      password: "",
+    },
   })
-  const [error, setError] = useState("")
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError("")
-
-    if (!formData.id || !formData.password) {
-      setError("Please fill in all fields")
-      return
-    }
-
+  const onSubmit = async (data: LoginFormData) => {
     try {
       await login.mutateAsync({
-        id: formData.id,
-        password: formData.password,
+        id: data.id,
+        password: data.password,
+      })
+      toast.success("Welcome back!", {
+        description: "You have successfully signed in.",
       })
       router.push("/")
     } catch (err) {
-      setError("Invalid email or password. Please try again.")
+      toast.error("Login failed", {
+        description: "Invalid email or password. Please try again.",
+      })
     }
   }
 
@@ -51,14 +58,8 @@ export default function LoginPage() {
         </CardDescription>
       </CardHeader>
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit(onSubmit)}>
         <CardContent className="space-y-4">
-          {error && (
-            <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-lg">
-              {error}
-            </div>
-          )}
-
           <div className="space-y-2">
             <Label htmlFor="id">Email, Phone, or Username</Label>
             <div className="relative">
@@ -67,12 +68,14 @@ export default function LoginPage() {
                 id="id"
                 type="text"
                 placeholder="Enter your email, phone, or username"
-                className="pl-10"
-                value={formData.id}
-                onChange={(e) => setFormData({ ...formData, id: e.target.value })}
-                disabled={login.isPending}
+                className={`pl-10 ${errors.id ? "border-destructive" : ""}`}
+                disabled={isSubmitting || login.isPending}
+                {...register("id")}
               />
             </div>
+            {errors.id && (
+              <p className="text-sm text-destructive">{errors.id.message}</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -91,10 +94,9 @@ export default function LoginPage() {
                 id="password"
                 type={showPassword ? "text" : "password"}
                 placeholder="Enter your password"
-                className="pl-10 pr-10"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                disabled={login.isPending}
+                className={`pl-10 pr-10 ${errors.password ? "border-destructive" : ""}`}
+                disabled={isSubmitting || login.isPending}
+                {...register("password")}
               />
               <button
                 type="button"
@@ -108,10 +110,13 @@ export default function LoginPage() {
                 )}
               </button>
             </div>
+            {errors.password && (
+              <p className="text-sm text-destructive">{errors.password.message}</p>
+            )}
           </div>
 
-          <Button type="submit" className="w-full" disabled={login.isPending}>
-            {login.isPending ? (
+          <Button type="submit" className="w-full" disabled={isSubmitting || login.isPending}>
+            {isSubmitting || login.isPending ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 Signing in...
@@ -133,7 +138,7 @@ export default function LoginPage() {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <Button variant="outline" type="button" disabled={login.isPending}>
+            <Button variant="outline" type="button" disabled={isSubmitting || login.isPending}>
               <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24">
                 <path
                   fill="currentColor"
@@ -154,7 +159,7 @@ export default function LoginPage() {
               </svg>
               Google
             </Button>
-            <Button variant="outline" type="button" disabled={login.isPending}>
+            <Button variant="outline" type="button" disabled={isSubmitting || login.isPending}>
               <svg className="h-4 w-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
               </svg>

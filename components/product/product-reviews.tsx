@@ -13,7 +13,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Separator } from "@/components/ui/separator"
+import { Badge } from "@/components/ui/badge"
 import {
 	Dialog,
 	DialogContent,
@@ -29,6 +29,8 @@ import {
 	MessageSquare,
 	Loader2,
 	Pencil,
+	ImageIcon,
+	MessageCircle,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -41,9 +43,12 @@ interface ProductReviewsProps {
 	}
 }
 
+type FilterType = "all" | "5" | "4" | "3" | "2" | "1" | "with_comment" | "with_media"
+
 export function ProductReviews({ productId, rating }: ProductReviewsProps) {
 	const { data: user } = useGetMe()
 	const isLoggedIn = !!user
+	const [activeFilter, setActiveFilter] = useState<FilterType>("all")
 	const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
 		useListComments({
 			limit: 10,
@@ -58,6 +63,24 @@ export function ProductReviews({ productId, rating }: ProductReviewsProps) {
 	const [hoverScore, setHoverScore] = useState<number | null>(null)
 
 	const comments = data?.pages.flatMap((page) => page.data) ?? []
+
+	// Filter comments based on active filter
+	const filteredComments = comments.filter((comment) => {
+		switch (activeFilter) {
+			case "5":
+			case "4":
+			case "3":
+			case "2":
+			case "1":
+				return comment.score === parseInt(activeFilter)
+			case "with_comment":
+				return comment.body && comment.body.trim().length > 0
+			case "with_media":
+				return comment.resources && comment.resources.length > 0
+			default:
+				return true
+		}
+	})
 
 	const handleSubmitReview = async () => {
 		await createComment.mutateAsync({
@@ -80,121 +103,191 @@ export function ProductReviews({ productId, rating }: ProductReviewsProps) {
 		})
 	}
 
+	// Calculate filter counts
+	const getFilterCount = (filter: FilterType): number => {
+		if (!rating) return 0
+		switch (filter) {
+			case "5":
+			case "4":
+			case "3":
+			case "2":
+			case "1":
+				return rating.breakdown?.[filter] || 0
+			case "with_comment":
+				return comments.filter(c => c.body && c.body.trim().length > 0).length
+			case "with_media":
+				return comments.filter(c => c.resources && c.resources.length > 0).length
+			default:
+				return rating.total
+		}
+	}
+
 	return (
 		<div className="space-y-6">
-			{/* Rating Summary */}
-			{rating && rating.total > 0 && (
-				<div className="flex flex-col md:flex-row gap-8">
-					<div className="text-center md:text-left">
-						<div className="text-5xl font-bold">
-							{(rating.score / 20).toFixed(1)}
-						</div>
-						<div className="flex items-center gap-1 mt-2 justify-center md:justify-start">
-							{Array.from({ length: 5 }).map((_, i) => (
-								<Star
-									key={i}
-									className={cn(
-										"h-4 w-4",
-										i < Math.round(rating.score / 20)
-											? "fill-yellow-400 text-yellow-400"
-											: "text-muted-foreground/30"
-									)}
-								/>
-							))}
-						</div>
-						<p className="text-sm text-muted-foreground mt-1">
-							{rating.total} reviews
-						</p>
-					</div>
+			{/* Section Header */}
+			<div className="flex items-center justify-between">
+				<h2 className="text-lg font-semibold">Product Reviews</h2>
+				<Button onClick={() => setIsWriteDialogOpen(true)} size="sm">
+					<Pencil className="h-4 w-4 mr-2" />
+					Write a Review
+				</Button>
+			</div>
 
-					{/* Rating Breakdown */}
-					<div className="flex-1 space-y-2">
-						{[5, 4, 3, 2, 1].map((stars) => {
-							const count = rating.breakdown?.[String(stars)] || 0
-							return (
-								<div key={stars} className="flex items-center gap-2">
-									<span className="text-sm w-8">{stars}★</span>
-									<div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-										<div
-											className="h-full bg-yellow-400"
-											style={{
-												width: `${
-													rating.total > 0 ? (count / rating.total) * 100 : 0
-												}%`,
-											}}
-										/>
+			{/* Rating Summary - Shopee Style */}
+			{rating && rating.total > 0 && (
+				<div className="bg-primary/5 rounded-lg p-6">
+					<div className="flex flex-col md:flex-row gap-8">
+						{/* Overall Rating */}
+						<div className="text-center md:text-left flex-shrink-0">
+							<div className="flex items-baseline justify-center md:justify-start gap-1">
+								<span className="text-4xl font-bold text-primary">
+									{(rating.score / 20).toFixed(1)}
+								</span>
+								<span className="text-lg text-muted-foreground">/ 5</span>
+							</div>
+							<div className="flex items-center gap-1 mt-2 justify-center md:justify-start">
+								{Array.from({ length: 5 }).map((_, i) => (
+									<Star
+										key={i}
+										className={cn(
+											"h-5 w-5",
+											i < Math.round(rating.score / 20)
+												? "fill-yellow-400 text-yellow-400"
+												: "text-muted-foreground/30"
+										)}
+									/>
+								))}
+							</div>
+							<p className="text-sm text-muted-foreground mt-1">
+								{rating.total.toLocaleString()} reviews
+							</p>
+						</div>
+
+						{/* Rating Breakdown Bars */}
+						<div className="flex-1 space-y-2">
+							{[5, 4, 3, 2, 1].map((stars) => {
+								const count = rating.breakdown?.[String(stars)] || 0
+								const percentage = rating.total > 0 ? (count / rating.total) * 100 : 0
+								return (
+									<div key={stars} className="flex items-center gap-3">
+										<button
+											onClick={() => setActiveFilter(String(stars) as FilterType)}
+											className={cn(
+												"text-sm w-12 flex items-center gap-1 hover:text-primary transition-colors",
+												activeFilter === String(stars) && "text-primary font-medium"
+											)}
+										>
+											{stars} <Star className="h-3 w-3 fill-current" />
+										</button>
+										<div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+											<div
+												className="h-full bg-yellow-400 transition-all"
+												style={{ width: `${percentage}%` }}
+											/>
+										</div>
+										<span className="text-sm text-muted-foreground w-12 text-right">
+											{count.toLocaleString()}
+										</span>
 									</div>
-									<span className="text-sm text-muted-foreground w-12 text-right">
-										{count}
-									</span>
-								</div>
-							)
-						})}
+								)
+							})}
+						</div>
 					</div>
 				</div>
 			)}
 
-			<Separator />
-
-			{/* Write Review Button */}
-			<div className="flex items-center justify-between">
-				<h3 className="font-medium">Customer Reviews</h3>
-				<Button onClick={() => setIsWriteDialogOpen(true)}>
-					<Pencil className="h-4 w-4 mr-2" />
-					Write a Review
-				</Button>
+			{/* Filter Chips - Shopee Style */}
+			<div className="flex flex-wrap gap-2">
+				<Badge
+					variant={activeFilter === "all" ? "default" : "outline"}
+					className="cursor-pointer hover:bg-primary/10 transition-colors px-4 py-2"
+					onClick={() => setActiveFilter("all")}
+				>
+					All ({rating?.total.toLocaleString() || 0})
+				</Badge>
+				{[5, 4, 3, 2, 1].map((stars) => (
+					<Badge
+						key={stars}
+						variant={activeFilter === String(stars) ? "default" : "outline"}
+						className="cursor-pointer hover:bg-primary/10 transition-colors px-4 py-2"
+						onClick={() => setActiveFilter(String(stars) as FilterType)}
+					>
+						{stars} Star ({getFilterCount(String(stars) as FilterType).toLocaleString()})
+					</Badge>
+				))}
+				<Badge
+					variant={activeFilter === "with_comment" ? "default" : "outline"}
+					className="cursor-pointer hover:bg-primary/10 transition-colors px-4 py-2"
+					onClick={() => setActiveFilter("with_comment")}
+				>
+					<MessageCircle className="h-3 w-3 mr-1" />
+					With Comments
+				</Badge>
+				<Badge
+					variant={activeFilter === "with_media" ? "default" : "outline"}
+					className="cursor-pointer hover:bg-primary/10 transition-colors px-4 py-2"
+					onClick={() => setActiveFilter("with_media")}
+				>
+					<ImageIcon className="h-3 w-3 mr-1" />
+					With Photos/Videos
+				</Badge>
 			</div>
 
 			{/* Reviews List */}
 			{isLoading ? (
 				<div className="space-y-4">
 					{[...Array(3)].map((_, i) => (
-						<Card key={i}>
-							<CardContent className="p-4">
-								<div className="flex gap-4">
-									<Skeleton className="h-10 w-10 rounded-full" />
-									<div className="flex-1 space-y-2">
-										<Skeleton className="h-4 w-32" />
-										<Skeleton className="h-4 w-24" />
-										<Skeleton className="h-16 w-full" />
-									</div>
+						<div key={i} className="border rounded-lg p-4">
+							<div className="flex gap-4">
+								<Skeleton className="h-10 w-10 rounded-full" />
+								<div className="flex-1 space-y-2">
+									<Skeleton className="h-4 w-32" />
+									<Skeleton className="h-4 w-24" />
+									<Skeleton className="h-16 w-full" />
 								</div>
-							</CardContent>
-						</Card>
+							</div>
+						</div>
 					))}
 				</div>
-			) : comments.length === 0 ? (
-				<Card>
-					<CardContent className="p-8 text-center">
-						<MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-						{isLoggedIn ? (
-							<>
-								<h3 className="font-medium mb-2">No reviews yet</h3>
-								<p className="text-muted-foreground text-sm mb-4">
-									Be the first to review this product
-								</p>
-								<Button onClick={() => setIsWriteDialogOpen(true)}>
-									Write a Review
-								</Button>
-							</>
-						) : (
-							<>
-								{/* only logged in can see the reviews */}
-								<h3 className="font-medium mb-2">Reviews are hidden</h3>
-								<p className="text-muted-foreground text-sm mb-4">
-									Please{" "}
-									<a href="/login" className="text-primary underline">
-										log in
-									</a>{" "}
-									to see reviews.
-								</p>
-							</>
-						)}
-					</CardContent>
-				</Card>
+			) : filteredComments.length === 0 ? (
+				<div className="border rounded-lg p-8 text-center">
+					<MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+					{activeFilter !== "all" ? (
+						<>
+							<h3 className="font-medium mb-2">No reviews match this filter</h3>
+							<p className="text-muted-foreground text-sm mb-4">
+								Try selecting a different filter
+							</p>
+							<Button variant="outline" onClick={() => setActiveFilter("all")}>
+								Show All Reviews
+							</Button>
+						</>
+					) : isLoggedIn ? (
+						<>
+							<h3 className="font-medium mb-2">No reviews yet</h3>
+							<p className="text-muted-foreground text-sm mb-4">
+								Be the first to review this product
+							</p>
+							<Button onClick={() => setIsWriteDialogOpen(true)}>
+								Write a Review
+							</Button>
+						</>
+					) : (
+						<>
+							<h3 className="font-medium mb-2">Reviews are hidden</h3>
+							<p className="text-muted-foreground text-sm mb-4">
+								Please{" "}
+								<a href="/login" className="text-primary underline">
+									log in
+								</a>{" "}
+								to see reviews.
+							</p>
+						</>
+					)}
+				</div>
 			) : (
 				<div className="space-y-4">
-					{comments.map((comment) => (
+					{filteredComments.map((comment) => (
 						<ReviewCard
 							key={comment.id}
 							comment={comment}
@@ -310,81 +403,80 @@ function ReviewCard({
 	formatDate: (date: string) => string
 }) {
 	return (
-		<Card>
-			<CardContent className="p-4">
-				<div className="flex gap-4">
-					<Avatar className="h-10 w-10">
-						<AvatarImage src={comment.profile?.avatar_url ?? undefined} />
-						<AvatarFallback>
-							{comment.profile?.name?.charAt(0) ||
-								comment.profile?.username?.charAt(0) ||
-								"U"}
-						</AvatarFallback>
-					</Avatar>
+		<div className="border rounded-lg p-4">
+			<div className="flex gap-4">
+				<Avatar className="h-10 w-10">
+					<AvatarImage src={comment.profile?.avatar_url ?? undefined} />
+					<AvatarFallback>
+						{comment.profile?.name?.charAt(0) ||
+							comment.profile?.username?.charAt(0) ||
+							"U"}
+					</AvatarFallback>
+				</Avatar>
 
-					<div className="flex-1 min-w-0">
-						<div className="flex items-center justify-between gap-2">
-							<div>
-								<p className="font-medium">
-									{comment.profile?.name ||
-										comment.profile?.username ||
-										"Anonymous"}
-								</p>
-								<div className="flex items-center gap-2 mt-1">
-									<div className="flex items-center gap-0.5">
-										{Array.from({ length: 5 }).map((_, i) => (
-											<Star
-												key={i}
-												className={cn(
-													"h-3 w-3",
-													i < comment.score
-														? "fill-yellow-400 text-yellow-400"
-														: "text-muted-foreground/30"
-												)}
-											/>
-										))}
-									</div>
-									<span className="text-xs text-muted-foreground">
-										{formatDate(comment.date_created)}
-									</span>
-								</div>
-							</div>
-						</div>
-
-						<p className="text-sm text-muted-foreground mt-3">{comment.body}</p>
-
-						{/* Review Images */}
-						{comment.resources && comment.resources.length > 0 && (
-							<div className="flex gap-2 mt-3 flex-wrap">
-								{comment.resources.map((resource, idx) => (
-									<div
-										key={idx}
-										className="relative h-16 w-16 rounded overflow-hidden bg-muted"
-									>
-										<Image
-											src={resource.url}
-											alt="Review"
-											fill
-											className="object-cover"
+				<div className="flex-1 min-w-0">
+					<div className="flex items-center justify-between gap-2">
+						<div>
+							<p className="font-medium">
+								{comment.profile?.name ||
+									comment.profile?.username ||
+									"Anonymous"}
+							</p>
+							<div className="flex items-center gap-2 mt-1">
+								<div className="flex items-center gap-0.5">
+									{Array.from({ length: 5 }).map((_, i) => (
+										<Star
+											key={i}
+											className={cn(
+												"h-3 w-3",
+												i < comment.score
+													? "fill-yellow-400 text-yellow-400"
+													: "text-muted-foreground/30"
+											)}
 										/>
-									</div>
-								))}
+									))}
+								</div>
+								<span className="text-xs text-muted-foreground">
+									{formatDate(comment.date_created)}
+								</span>
 							</div>
-						)}
-
-						{/* Helpful Buttons */}
-						<div className="flex items-center gap-4 mt-4">
-							<button className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
-								<ThumbsUp className="h-3 w-3" />
-								Helpful ({comment.upvote})
-							</button>
-							<button className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
-								<ThumbsDown className="h-3 w-3" />({comment.downvote})
-							</button>
 						</div>
 					</div>
+
+					<p className="text-sm text-muted-foreground mt-3">{comment.body}</p>
+
+					{/* Review Images */}
+					{comment.resources && comment.resources.length > 0 && (
+						<div className="flex gap-2 mt-3 flex-wrap">
+							{comment.resources.map((resource, idx) => (
+								<div
+									key={idx}
+									className="relative h-20 w-20 rounded-lg overflow-hidden bg-muted cursor-pointer hover:opacity-90 transition-opacity"
+								>
+									<Image
+										src={resource.url}
+										alt="Review"
+										fill
+										className="object-cover"
+									/>
+								</div>
+							))}
+						</div>
+					)}
+
+					{/* Helpful Buttons */}
+					<div className="flex items-center gap-4 mt-4">
+						<button className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+							<ThumbsUp className="h-3.5 w-3.5" />
+							Helpful ({comment.upvote})
+						</button>
+						<button className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+							<ThumbsDown className="h-3.5 w-3.5" />
+							({comment.downvote})
+						</button>
+					</div>
 				</div>
-			</CardContent>
-		</Card>
+			</div>
+		</div>
 	)
 }

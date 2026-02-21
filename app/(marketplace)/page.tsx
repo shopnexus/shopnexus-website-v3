@@ -1,11 +1,9 @@
 "use client"
 
-import { useState } from "react"
-import { useListProductCards, useListProductCardsRecommended, TProductCard } from "@/core/catalog/product.customer"
+import { useListProductCards, useListProductCardsRecommended } from "@/core/catalog/product.customer"
 import { useListCategories } from "@/core/catalog/category"
 import { ProductGrid } from "@/components/product/product-grid"
 import { ProductCard, ProductCardSkeleton } from "@/components/product/product-card"
-import { ProductQuickView } from "@/components/product/product-quick-view"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -14,8 +12,6 @@ import Link from "next/link"
 import { useMemo } from "react"
 
 export default function HomePage() {
-  const [quickViewProduct, setQuickViewProduct] = useState<TProductCard | null>(null)
-
   const {
     data: productsData,
     isLoading: isLoadingProducts,
@@ -159,7 +155,6 @@ export default function HomePage() {
                 <ProductCard
                   key={product.id}
                   product={product}
-                  onQuickView={setQuickViewProduct}
                 />
               ))}
             </div>
@@ -179,7 +174,6 @@ export default function HomePage() {
           isFetchingNextPage={isFetchingNextPage}
           hasNextPage={hasNextPage}
           onLoadMore={() => fetchNextPage()}
-          onQuickView={setQuickViewProduct}
           skeletonCount={12}
         />
       </section>
@@ -208,13 +202,6 @@ export default function HomePage() {
           </CardContent>
         </Card>
       </section>
-
-      {/* Quick View Modal */}
-      <ProductQuickView
-        product={quickViewProduct}
-        open={!!quickViewProduct}
-        onOpenChange={(open) => !open && setQuickViewProduct(null)}
-      />
     </div>
   )
 }
