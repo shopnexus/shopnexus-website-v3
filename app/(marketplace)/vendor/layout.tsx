@@ -15,6 +15,7 @@ import {
   RotateCcw,
   Tag,
   BarChart3,
+  MessageCircle,
   Settings,
   LogOut,
   Store,
@@ -26,6 +27,7 @@ const sidebarLinks = [
   { href: "/vendor/orders", label: "Orders", icon: ShoppingCart },
   { href: "/vendor/refunds", label: "Refunds", icon: RotateCcw },
   { href: "/vendor/promotions", label: "Promotions", icon: Tag },
+  { href: "/account/chat", label: "Chat", icon: MessageCircle },
   { href: "/vendor/settings", label: "Settings", icon: Settings },
 ]
 

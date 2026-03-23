@@ -15,6 +15,7 @@ import {
   Heart,
   MapPin,
   CreditCard,
+  MessageCircle,
   Settings,
   LogOut,
 } from "lucide-react"
@@ -26,6 +27,7 @@ const sidebarLinks = [
   { href: "/account/wishlist", label: "Wishlist", icon: Heart },
   { href: "/account/addresses", label: "Addresses", icon: MapPin },
   { href: "/account/payment", label: "Payment Methods", icon: CreditCard },
+  { href: "/account/chat", label: "Chat", icon: MessageCircle },
   { href: "/account/settings", label: "Settings", icon: Settings },
 ]
 

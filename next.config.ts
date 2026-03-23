@@ -9,7 +9,8 @@ const nextConfig: NextConfig = {
         hostname: '*',
       }
     ]
-  }
+  },
+  allowedDevOrigins: ['shopnexus.hopto.org'],
 }
 
 export default nextConfig
