@@ -2,10 +2,9 @@
 
 import { use, useMemo } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { useGetAccount } from "@/core/account/account"
 import { useListProductCards } from "@/core/catalog/product.customer"
-import { useCreateConversation } from "@/core/chat/chat"
+import { useChatContext } from "@/components/chat/chat-context"
 import { ProductGrid } from "@/components/product/product-grid"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -19,9 +18,7 @@ import {
 	Package,
 	Calendar,
 	ChevronRight,
-	Loader2,
 } from "lucide-react"
-import { toast } from "@/components/ui/sonner"
 
 export default function StorePage({
 	params,
@@ -29,10 +26,9 @@ export default function StorePage({
 	params: Promise<{ id: string }>
 }) {
 	const { id } = use(params)
-	const router = useRouter()
 
 	const { data: vendor, isLoading: isLoadingVendor } = useGetAccount(id)
-	const createConversation = useCreateConversation()
+	const { openChat } = useChatContext()
 
 	const {
 		data: productsData,
@@ -46,15 +42,8 @@ export default function StorePage({
 		return productsData?.pages.flatMap((page) => page.data) ?? []
 	}, [productsData])
 
-	const handleChatWithSeller = async () => {
-		try {
-			const conversation = await createConversation.mutateAsync({
-				vendor_id: id,
-			})
-			router.push(`/chat?conversation=${conversation.id}`)
-		} catch {
-			toast.error("Failed to start conversation")
-		}
+	const handleChatWithSeller = () => {
+		openChat(id)
 	}
 
 	if (isLoadingVendor) {
@@ -145,14 +134,9 @@ export default function StorePage({
 						<div className="flex gap-2 sm:gap-3 flex-shrink-0">
 							<Button
 								onClick={handleChatWithSeller}
-								disabled={createConversation.isPending}
 								className="gap-2"
 							>
-								{createConversation.isPending ? (
-									<Loader2 className="h-4 w-4 animate-spin" />
-								) : (
-									<MessageCircle className="h-4 w-4" />
-								)}
+								<MessageCircle className="h-4 w-4" />
 								Chat with Seller
 							</Button>
 						</div>

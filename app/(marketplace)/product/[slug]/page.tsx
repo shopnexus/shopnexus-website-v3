@@ -43,6 +43,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "@/components/ui/sonner"
+import { useChatContext } from "@/components/chat/chat-context"
 
 type SelectedAttributes = Record<string, string>
 
@@ -57,6 +58,7 @@ export default function ProductDetailPage({
 	const { data: recommendedProducts, isLoading: isLoadingRecommended } =
 		useListProductCardsRecommended({ limit: 4 })
 	const updateCart = useUpdateCart()
+	const { openChat } = useChatContext()
 
 	const [selectedAttributes, setSelectedAttributes] = useState<SelectedAttributes>({})
 	const [quantity, setQuantity] = useState(1)
@@ -605,7 +607,12 @@ export default function ProductDetailPage({
 												Visit Store
 											</Link>
 										</Button>
-										<Button variant="outline" size="sm" className="flex-1 h-9 text-xs sm:text-sm">
+										<Button
+											variant="outline"
+											size="sm"
+											className="flex-1 h-9 text-xs sm:text-sm"
+											onClick={() => openChat(vendor.id)}
+										>
 											<MessageCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
 											Chat
 										</Button>
