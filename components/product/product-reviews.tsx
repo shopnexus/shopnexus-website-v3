@@ -104,30 +104,30 @@ export function ProductReviews({ productId, rating }: ProductReviewsProps) {
 	}
 
 	const handleSubmitReview = async () => {
-		// Upload files first
-		const ids: string[] = []
-		for (const file of reviewFiles) {
-			try {
+		try {
+			// Upload files first
+			const ids: string[] = []
+			for (const file of reviewFiles) {
 				const result = await uploadFile.mutateAsync(file)
 				ids.push(result.id)
-			} catch {
-				// skip failed uploads
 			}
-		}
 
-		await createComment.mutateAsync({
-			ref_type: "ProductSpu",
-			ref_id: productId,
-			body: reviewBody,
-			score: reviewScore,
-			resource_ids: ids,
-		})
-		setIsWriteDialogOpen(false)
-		setReviewBody("")
-		setReviewScore(5)
-		setReviewFiles([])
-		previewUrls.forEach(url => URL.revokeObjectURL(url))
-		setPreviewUrls([])
+			await createComment.mutateAsync({
+				ref_type: "ProductSpu",
+				ref_id: productId,
+				body: reviewBody,
+				score: reviewScore,
+				resource_ids: ids,
+			})
+			setIsWriteDialogOpen(false)
+			setReviewBody("")
+			setReviewScore(5)
+			setReviewFiles([])
+			previewUrls.forEach(url => URL.revokeObjectURL(url))
+			setPreviewUrls([])
+		} catch (err) {
+			console.error("Failed to submit review:", err)
+		}
 	}
 
 	const formatDate = (dateStr: string) => {
