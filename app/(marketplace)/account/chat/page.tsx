@@ -155,7 +155,7 @@ function ConversationItem({
 }) {
   const isCustomer = conversation.customer_id === currentUserId
   const partnerId = isCustomer ? conversation.vendor_id : conversation.customer_id
-  const partnerLabel = isCustomer ? "Vendor" : "Customer"
+  const partnerLabel = isCustomer ? "Seller" : "Buyer"
   const partnerInitial = partnerLabel.charAt(0)
   const truncatedId = partnerId.slice(0, 8)
 
@@ -233,7 +233,7 @@ function MessagePanel({
 
   const isCustomer = conversation.customer_id === currentUserId
   const partnerId = isCustomer ? conversation.vendor_id : conversation.customer_id
-  const partnerLabel = isCustomer ? "Vendor" : "Customer"
+  const partnerLabel = isCustomer ? "Seller" : "Buyer"
   const partnerInitial = partnerLabel.charAt(0)
 
   // Mark conversation as read when opened

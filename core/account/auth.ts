@@ -19,7 +19,6 @@ const removeAuthTokens = () => {
 export const useRegisterBasic = () =>
   useMutation({
     mutationFn: async (params: {
-      type: 'Customer' | 'Vendor'
       username?: string | null
       email?: string | null
       phone?: string | null

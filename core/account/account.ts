@@ -4,11 +4,6 @@ import { customFetchStandard } from '@/lib/queryclient/custom-fetch'
 
 // ===== Types =====
 
-export enum AccountType {
-  Customer = 'Customer',
-  Vendor = 'Vendor',
-}
-
 export enum AccountGender {
   Male,
   Female,
@@ -25,7 +20,6 @@ export type AccountProfile = {
   date_created: string
   date_updated: string
 
-  type: AccountType
   status: AccountStatus
   phone: string | null
   email: string | null

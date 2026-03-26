@@ -56,7 +56,6 @@ export default function RegisterPage() {
 
     try {
       await registerMutation.mutateAsync({
-        type: "Customer",
         email: data.email,
         username: data.name || null,
         password: data.password,
