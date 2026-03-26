@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Search, ShoppingCart, User, Menu, Heart, Store, LogOut } from "lucide-react"
+import { Search, ShoppingCart, User, Menu, Heart, Store, LogOut, Bell } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
@@ -17,6 +17,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useGetCart } from "@/core/order/cart"
 import { useGetMe } from "@/core/account/account"
 import { useSignOut } from "@/core/account/auth"
+import { useUnreadCount } from "@/core/account/notification"
 import { CartSheet } from "@/components/cart/cart-sheet"
 import { ThemeToggle } from "@/components/layout/theme-toggle"
 import { useState } from "react"
@@ -30,6 +31,7 @@ export function Header() {
 	const [isCartOpen, setIsCartOpen] = useState(false)
 	const router = useRouter()
 
+	const { data: unreadData } = useUnreadCount()
 	const isLoggedIn = !!user
 	const cartItemCount = cart?.reduce((acc, item) => acc + item.quantity, 0) ?? 0
 
@@ -157,6 +159,24 @@ export function Header() {
 								<span className="sr-only">Wishlist</span>
 							</Link>
 						</Button>
+
+						{/* Notifications */}
+						{isLoggedIn && (
+							<Button variant="ghost" size="icon" className="relative hidden sm:flex" asChild>
+								<Link href="/account/notifications">
+									<Bell className="h-5 w-5" />
+									{(unreadData?.count ?? 0) > 0 && (
+										<Badge
+											variant="destructive"
+											className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+										>
+											{(unreadData?.count ?? 0) > 99 ? "99+" : unreadData?.count}
+										</Badge>
+									)}
+									<span className="sr-only">Notifications</span>
+								</Link>
+							</Button>
+						)}
 
 						{/* Theme Toggle */}
 						<ThemeToggle />
