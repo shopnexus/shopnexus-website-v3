@@ -10,7 +10,7 @@ import {
   type Contact,
 } from "@/core/account/contact"
 import { useGetMe, useUpdateMe } from "@/core/account/account"
-import { useGeolocation } from "@/lib/geocoding/use-geolocation"
+import { useGeolocation, formatAccuracy } from "@/lib/geocoding/use-geolocation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -394,11 +394,22 @@ export default function AddressesPage() {
                 />
               </div>
               {formData.latitude != null && formData.longitude != null && (
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Navigation className="h-3 w-3" />
-                  Coordinates: {formData.latitude.toFixed(6)},{" "}
-                  {formData.longitude.toFixed(6)}
-                </p>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Navigation className="h-3 w-3" />
+                    Coordinates: {formData.latitude.toFixed(6)},{" "}
+                    {formData.longitude.toFixed(6)}
+                  </p>
+                  {geoResult?.accuracy != null && (
+                    <p className={`text-xs flex items-center gap-1 ${
+                      formatAccuracy(geoResult.accuracy).level === 'good' ? 'text-green-600' :
+                      formatAccuracy(geoResult.accuracy).level === 'ok' ? 'text-yellow-600' :
+                      'text-red-500'
+                    }`}>
+                      📍 Accuracy: {formatAccuracy(geoResult.accuracy).label}
+                    </p>
+                  )}
+                </div>
               )}
             </div>
 

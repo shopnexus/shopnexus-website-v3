@@ -5,6 +5,7 @@ export type GeocodingResult = {
   address: string
   latitude: number
   longitude: number
+  accuracy: number // meters — lower is better
 }
 
 // useGeolocation gets browser GPS position and reverse geocodes via the backend.
@@ -35,17 +36,17 @@ export function useGeolocation() {
         }, { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 })
       })
 
+      const { latitude, longitude, accuracy } = position.coords
+
       // Step 2: Reverse geocode via backend
-      const geocoded = await customFetchStandard<GeocodingResult>('common/geocode/reverse', {
+      const geocoded = await customFetchStandard<Omit<GeocodingResult, 'accuracy'>>('common/geocode/reverse', {
         method: 'POST',
-        body: JSON.stringify({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        }),
+        body: JSON.stringify({ latitude, longitude }),
       })
 
-      setResult(geocoded)
-      return geocoded
+      const fullResult: GeocodingResult = { ...geocoded, accuracy }
+      setResult(fullResult)
+      return fullResult
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to get location'
       setError(message)
@@ -56,4 +57,12 @@ export function useGeolocation() {
   }, [])
 
   return { getLocation, isLoading, error, result }
+}
+
+// Format accuracy into a human-readable string.
+export function formatAccuracy(meters: number): { label: string; level: 'good' | 'ok' | 'poor' } {
+  if (meters <= 20) return { label: `±${Math.round(meters)}m (precise)`, level: 'good' }
+  if (meters <= 100) return { label: `±${Math.round(meters)}m`, level: 'ok' }
+  if (meters <= 1000) return { label: `±${(meters / 1000).toFixed(1)}km (approximate)`, level: 'poor' }
+  return { label: `±${Math.round(meters / 1000)}km (very approximate — please verify address)`, level: 'poor' }
 }
