@@ -4,9 +4,9 @@ import { useState } from "react"
 import {
   useListPaymentMethods,
   useCreatePaymentMethod,
-  useUpdatePaymentMethod,
   useDeletePaymentMethod,
   useSetDefaultPaymentMethod,
+  useTokenizeCard,
   type PaymentMethod,
 } from "@/core/account/payment-method"
 import { Button } from "@/components/ui/button"
@@ -15,7 +15,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Textarea } from "@/components/ui/textarea"
 import {
   Dialog,
   DialogContent,
@@ -25,125 +24,88 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
   CreditCard,
-  Wallet,
   Plus,
-  Pencil,
   Trash2,
   Star,
   Loader2,
-  Landmark,
+  Info,
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 
-const PAYMENT_TYPES = [
-  { value: "card", label: "Credit / Debit Card", icon: CreditCard },
-  { value: "e-wallet", label: "E-Wallet", icon: Wallet },
-  { value: "bank-transfer", label: "Bank Transfer", icon: Landmark },
-] as const
-
-type PaymentTypeValue = (typeof PAYMENT_TYPES)[number]["value"]
-
-function getTypeIcon(type: string) {
-  const found = PAYMENT_TYPES.find((t) => t.value === type)
-  return found?.icon ?? CreditCard
-}
-
-function getTypeLabel(type: string) {
-  const found = PAYMENT_TYPES.find((t) => t.value === type)
-  return found?.label ?? type
-}
-
-type PaymentFormData = {
-  type: PaymentTypeValue
+type CardFormData = {
+  provider: string
   label: string
-  data: string // JSON string for the data field
+  token: string
   is_default: boolean
 }
 
-const emptyForm: PaymentFormData = {
-  type: "card",
+const emptyCardForm: CardFormData = {
+  provider: "",
   label: "",
-  data: "{}",
+  token: "",
   is_default: false,
+}
+
+function formatCardNumber(last4?: string) {
+  if (!last4) return null
+  return `**** **** **** ${last4}`
+}
+
+function formatExpiry(month?: number, year?: number) {
+  if (month == null || year == null) return null
+  return `${String(month).padStart(2, "0")}/${year}`
+}
+
+function capitalizeFirst(str?: string) {
+  if (!str) return null
+  return str.charAt(0).toUpperCase() + str.slice(1)
 }
 
 export default function PaymentPage() {
   const { data: paymentMethods, isLoading } = useListPaymentMethods()
   const createPaymentMethod = useCreatePaymentMethod()
-  const updatePaymentMethod = useUpdatePaymentMethod()
   const deletePaymentMethod = useDeletePaymentMethod()
   const setDefaultPaymentMethod = useSetDefaultPaymentMethod()
+  const tokenizeCard = useTokenizeCard()
 
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [editingMethod, setEditingMethod] = useState<PaymentMethod | null>(null)
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<PaymentMethod | null>(null)
-  const [formData, setFormData] = useState<PaymentFormData>(emptyForm)
+  const [formData, setFormData] = useState<CardFormData>(emptyCardForm)
+  const [showDevForm, setShowDevForm] = useState(false)
+
+  // Filter to only show card-type payment methods
+  const cards = paymentMethods?.filter((m) => m.type === "card") ?? []
 
   const openAddDialog = () => {
-    setEditingMethod(null)
-    setFormData(emptyForm)
-    setIsDialogOpen(true)
-  }
-
-  const openEditDialog = (method: PaymentMethod) => {
-    setEditingMethod(method)
-    setFormData({
-      type: method.type as PaymentTypeValue,
-      label: method.label,
-      data: JSON.stringify(method.data, null, 2),
-      is_default: method.is_default,
-    })
-    setIsDialogOpen(true)
+    setFormData(emptyCardForm)
+    setShowDevForm(false)
+    setIsAddDialogOpen(true)
   }
 
   const handleSubmit = async () => {
     if (!formData.label) {
-      toast.error("Please enter a label for this payment method")
+      toast.error("Please enter a label for this card")
       return
     }
-
-    let parsedData: Record<string, unknown>
-    try {
-      parsedData = JSON.parse(formData.data)
-    } catch {
-      toast.error("Invalid JSON in data field")
+    if (!formData.provider) {
+      toast.error("Please enter a provider")
       return
     }
 
     try {
-      if (editingMethod) {
-        await updatePaymentMethod.mutateAsync({
-          id: editingMethod.id,
-          type: formData.type,
-          label: formData.label,
-          data: parsedData,
-        })
-        toast.success("Payment method updated successfully")
-      } else {
-        await createPaymentMethod.mutateAsync({
-          type: formData.type,
-          label: formData.label,
-          data: parsedData,
-          is_default: formData.is_default,
-        })
-        toast.success("Payment method added successfully")
-      }
-      setIsDialogOpen(false)
+      await createPaymentMethod.mutateAsync({
+        type: "card",
+        provider: formData.provider,
+        label: formData.label,
+        data: formData.token ? { token: formData.token } : {},
+        is_default: formData.is_default,
+      })
+      toast.success("Card added successfully")
+      setIsAddDialogOpen(false)
     } catch (error) {
-      toast.error(
-        editingMethod
-          ? "Failed to update payment method"
-          : "Failed to add payment method"
-      )
+      toast.error("Failed to add card")
       console.error(error)
     }
   }
@@ -152,10 +114,10 @@ export default function PaymentPage() {
     if (!deleteConfirm) return
     try {
       await deletePaymentMethod.mutateAsync({ id: deleteConfirm.id })
-      toast.success("Payment method deleted successfully")
+      toast.success("Card deleted successfully")
       setDeleteConfirm(null)
     } catch (error) {
-      toast.error("Failed to delete payment method")
+      toast.error("Failed to delete card")
       console.error(error)
     }
   }
@@ -163,15 +125,12 @@ export default function PaymentPage() {
   const handleSetDefault = async (id: string) => {
     try {
       await setDefaultPaymentMethod.mutateAsync(id)
-      toast.success("Default payment method updated")
+      toast.success("Default card updated")
     } catch (error) {
-      toast.error("Failed to set default payment method")
+      toast.error("Failed to set default card")
       console.error(error)
     }
   }
-
-  const isSubmitting =
-    createPaymentMethod.isPending || updatePaymentMethod.isPending
 
   if (isLoading) {
     return <PaymentMethodsSkeleton />
@@ -183,33 +142,36 @@ export default function PaymentPage() {
         <div>
           <h1 className="text-2xl font-bold">Payment Methods</h1>
           <p className="text-muted-foreground">
-            Manage your saved payment methods
+            Manage your saved cards
           </p>
         </div>
         <Button onClick={openAddDialog}>
           <Plus className="h-4 w-4 mr-2" />
-          Add Payment Method
+          Add Card
         </Button>
       </div>
 
-      {!paymentMethods || paymentMethods.length === 0 ? (
+      {cards.length === 0 ? (
         <div className="text-center py-16">
           <div className="inline-flex h-24 w-24 items-center justify-center rounded-full bg-muted mb-6">
             <CreditCard className="h-12 w-12 text-muted-foreground" />
           </div>
-          <h2 className="text-2xl font-semibold mb-2">No payment methods yet</h2>
+          <h2 className="text-2xl font-semibold mb-2">No cards yet</h2>
           <p className="text-muted-foreground max-w-md mx-auto mb-6">
-            Add a payment method for faster checkout.
+            Add a card for faster checkout.
           </p>
           <Button onClick={openAddDialog}>
             <Plus className="h-4 w-4 mr-2" />
-            Add Your First Payment Method
+            Add Your First Card
           </Button>
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
-          {paymentMethods.map((method) => {
-            const TypeIcon = getTypeIcon(method.type)
+          {cards.map((method) => {
+            const cardNumber = formatCardNumber(method.data?.last4)
+            const expiry = formatExpiry(method.data?.exp_month, method.data?.exp_year)
+            const brand = capitalizeFirst(method.data?.brand)
+            const cardType = capitalizeFirst(method.data?.card_type)
 
             return (
               <Card
@@ -218,11 +180,10 @@ export default function PaymentPage() {
               >
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className="gap-1">
-                        <TypeIcon className="h-3 w-3" />
-                        {getTypeLabel(method.type)}
-                      </Badge>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {cardType && (
+                        <Badge variant="secondary">{cardType}</Badge>
+                      )}
                       {method.is_default && (
                         <Badge className="gap-1">
                           <Star className="h-3 w-3" />
@@ -234,14 +195,6 @@ export default function PaymentPage() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8"
-                        onClick={() => openEditDialog(method)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
                         className="h-8 w-8 text-destructive hover:text-destructive"
                         onClick={() => setDeleteConfirm(method)}
                       >
@@ -250,11 +203,20 @@ export default function PaymentPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-1 text-sm">
+                  <div className="space-y-1.5 text-sm">
                     <div className="flex items-center gap-2">
-                      <TypeIcon className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <span className="font-medium">{method.label}</span>
+                      <CreditCard className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <span className="font-medium">
+                        {brand && cardNumber
+                          ? `${brand} ${cardNumber}`
+                          : cardNumber ?? method.label}
+                      </span>
                     </div>
+                    {expiry && (
+                      <p className="text-muted-foreground pl-6">
+                        Expires {expiry}
+                      </p>
+                    )}
                   </div>
 
                   {!method.is_default && (
@@ -276,106 +238,119 @@ export default function PaymentPage() {
         </div>
       )}
 
-      {/* Add/Edit Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      {/* Add Card Dialog */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {editingMethod ? "Edit Payment Method" : "Add Payment Method"}
-            </DialogTitle>
+            <DialogTitle>Add Card</DialogTitle>
             <DialogDescription>
-              {editingMethod
-                ? "Update your payment method details."
-                : "Add a new payment method to your account."}
+              Add a credit or debit card to your account.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="type">Type</Label>
-              <Select
-                value={formData.type}
-                onValueChange={(value: PaymentTypeValue) =>
-                  setFormData({ ...formData, type: value })
-                }
-              >
-                <SelectTrigger id="type">
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {PAYMENT_TYPES.map((pt) => (
-                    <SelectItem key={pt.value} value={pt.value}>
-                      <div className="flex items-center gap-2">
-                        <pt.icon className="h-4 w-4" />
-                        {pt.label}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="label">Label</Label>
-              <div className="relative">
-                <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="label"
-                  placeholder="e.g. My Visa ending in 4242"
-                  className="pl-10"
-                  value={formData.label}
-                  onChange={(e) =>
-                    setFormData({ ...formData, label: e.target.value })
-                  }
-                />
+            <div className="rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/50 p-4">
+              <div className="flex gap-3">
+                <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                <p className="text-sm text-blue-800 dark:text-blue-300">
+                  Card payment integration coming soon. You'll be able to add
+                  credit/debit cards for one-click payments.
+                </p>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="data">Data (JSON)</Label>
-              <Textarea
-                id="data"
-                placeholder='{"card_number": "****4242", "expiry": "12/25"}'
-                rows={4}
-                className="font-mono text-sm"
-                value={formData.data}
-                onChange={(e) =>
-                  setFormData({ ...formData, data: e.target.value })
-                }
-              />
-            </div>
+            {!showDevForm && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => setShowDevForm(true)}
+              >
+                Manual entry (dev/testing)
+              </Button>
+            )}
 
-            {!editingMethod && (
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="rounded"
-                  checked={formData.is_default}
-                  onChange={(e) =>
-                    setFormData({ ...formData, is_default: e.target.checked })
-                  }
-                />
-                <span className="text-sm">Set as default payment method</span>
-              </label>
+            {showDevForm && (
+              <div className="space-y-4 border rounded-lg p-4">
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
+                  Dev / Testing Fallback
+                </p>
+
+                <div className="space-y-2">
+                  <Label htmlFor="provider">Provider</Label>
+                  <Input
+                    id="provider"
+                    placeholder="e.g. stripe, adyen"
+                    value={formData.provider}
+                    onChange={(e) =>
+                      setFormData({ ...formData, provider: e.target.value })
+                    }
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="label">Label</Label>
+                  <div className="relative">
+                    <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="label"
+                      placeholder="e.g. My Visa ending in 4242"
+                      className="pl-10"
+                      value={formData.label}
+                      onChange={(e) =>
+                        setFormData({ ...formData, label: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="token">Token</Label>
+                  <Input
+                    id="token"
+                    placeholder="tok_xxxxxxxxxxxx"
+                    className="font-mono text-sm"
+                    value={formData.token}
+                    onChange={(e) =>
+                      setFormData({ ...formData, token: e.target.value })
+                    }
+                  />
+                </div>
+
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="rounded"
+                    checked={formData.is_default}
+                    onChange={(e) =>
+                      setFormData({ ...formData, is_default: e.target.checked })
+                    }
+                  />
+                  <span className="text-sm">Set as default card</span>
+                </label>
+              </div>
             )}
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSubmit} disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : editingMethod ? (
-                "Save Changes"
-              ) : (
-                "Add Payment Method"
-              )}
-            </Button>
+            {showDevForm && (
+              <Button
+                onClick={handleSubmit}
+                disabled={createPaymentMethod.isPending}
+              >
+                {createPaymentMethod.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  "Add Card"
+                )}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -387,18 +362,32 @@ export default function PaymentPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Payment Method</DialogTitle>
+            <DialogTitle>Delete Card</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this payment method? This action
-              cannot be undone.
+              Are you sure you want to delete this card? This action cannot be
+              undone.
             </DialogDescription>
           </DialogHeader>
           {deleteConfirm && (
             <div className="rounded-lg border p-4 space-y-1">
-              <p className="font-medium">{deleteConfirm.label}</p>
-              <p className="text-sm text-muted-foreground">
-                {getTypeLabel(deleteConfirm.type)}
-              </p>
+              <div className="flex items-center gap-2">
+                <CreditCard className="h-4 w-4 text-muted-foreground" />
+                <p className="font-medium">
+                  {deleteConfirm.data?.brand
+                    ? `${capitalizeFirst(deleteConfirm.data.brand)} ${formatCardNumber(deleteConfirm.data.last4) ?? ""}`
+                    : deleteConfirm.label}
+                </p>
+              </div>
+              {deleteConfirm.data?.exp_month != null &&
+                deleteConfirm.data?.exp_year != null && (
+                  <p className="text-sm text-muted-foreground pl-6">
+                    Expires{" "}
+                    {formatExpiry(
+                      deleteConfirm.data.exp_month,
+                      deleteConfirm.data.exp_year
+                    )}
+                  </p>
+                )}
             </div>
           )}
           <DialogFooter>
@@ -434,7 +423,7 @@ function PaymentMethodsSkeleton() {
           <Skeleton className="h-8 w-48" />
           <Skeleton className="h-4 w-56 mt-1" />
         </div>
-        <Skeleton className="h-10 w-44" />
+        <Skeleton className="h-10 w-32" />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         {Array.from({ length: 2 }).map((_, i) => (
@@ -442,15 +431,14 @@ function PaymentMethodsSkeleton() {
             <CardContent className="p-4">
               <div className="flex items-start justify-between mb-3">
                 <div className="flex gap-2">
-                  <Skeleton className="h-5 w-24 rounded-full" />
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                  <Skeleton className="h-5 w-20 rounded-full" />
                 </div>
-                <div className="flex gap-1">
-                  <Skeleton className="h-8 w-8" />
-                  <Skeleton className="h-8 w-8" />
-                </div>
+                <Skeleton className="h-8 w-8" />
               </div>
               <div className="space-y-2">
-                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-4 w-52" />
+                <Skeleton className="h-4 w-28" />
               </div>
               <Skeleton className="h-8 w-full mt-4" />
             </CardContent>
