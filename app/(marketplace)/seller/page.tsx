@@ -173,8 +173,8 @@ function DashboardChart({
               <XAxis dataKey="date" className="text-xs" tick={{ fontSize: 12 }} />
               <YAxis className="text-xs" tick={{ fontSize: 12 }} tickFormatter={formatValue} />
               <Tooltip
-                formatter={(value: number) =>
-                  formatValue ? [formatValue(value), title] : [value.toLocaleString(), title]
+                formatter={(value) =>
+                  formatValue ? [formatValue(Number(value)), title] : [Number(value).toLocaleString(), title]
                 }
               />
               <Line
