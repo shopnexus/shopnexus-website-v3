@@ -30,5 +30,6 @@ export const useGetCategory = (id: string) =>
   useQuery({
     queryKey: ['category', 'detail', id],
     queryFn: () => customFetchStandard<Category>(`catalog/category/${id}`),
+    enabled: !!id,
   })
 

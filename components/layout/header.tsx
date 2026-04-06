@@ -21,13 +21,14 @@ import { useUnreadCount } from "@/core/account/notification"
 import { CartSheet } from "@/components/cart/cart-sheet"
 import { ThemeToggle } from "@/components/layout/theme-toggle"
 import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 
 export function Header() {
 	const { data: cart } = useGetCart()
 	const { data: user, isLoading: isLoadingUser } = useGetMe()
 	const signOut = useSignOut()
-	const [searchQuery, setSearchQuery] = useState("")
+	const searchParams = useSearchParams()
+	const [searchQuery, setSearchQuery] = useState(searchParams.get("q") ?? "")
 	const [isCartOpen, setIsCartOpen] = useState(false)
 	const router = useRouter()
 
@@ -42,9 +43,8 @@ export function Header() {
 
 	const handleSearch = (e: React.FormEvent) => {
 		e.preventDefault()
-		if (searchQuery.trim()) {
-			router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`)
-		}
+		const q = searchQuery.trim()
+		router.push(q ? `/search?q=${encodeURIComponent(q)}` : "/search")
 	}
 
 	return (
