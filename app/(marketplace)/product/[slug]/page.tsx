@@ -69,9 +69,9 @@ export default function ProductDetailPage({
 	const { slug } = use(params)
 	const { data: product, isLoading, error } = useGetProductDetail({ slug })
 	const { data: vendor, isLoading: isLoadingVendor } = useGetAccount(
-		product?.vendor_id ?? "",
+		product?.seller_id ?? "",
 	)
-	const { data: vendorStats } = useGetVendorStats(product?.vendor_id ?? "")
+	const { data: vendorStats } = useGetVendorStats(product?.seller_id ?? "")
 	const { data: recommendedProducts, isLoading: isLoadingRecommended } =
 		useListProductCardsRecommended({ limit: 4 })
 	const updateCart = useUpdateCart()

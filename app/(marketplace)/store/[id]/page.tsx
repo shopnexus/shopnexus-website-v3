@@ -36,7 +36,7 @@ export default function StorePage({
 		fetchNextPage,
 		hasNextPage,
 		isFetchingNextPage,
-	} = useListProductCards({ vendor_id: id, limit: 20 })
+	} = useListProductCards({ seller_id: id, limit: 20 })
 
 	const products = useMemo(() => {
 		return productsData?.pages.flatMap((page) => page.data) ?? []

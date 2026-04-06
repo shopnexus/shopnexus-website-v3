@@ -59,7 +59,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
       try {
         const conversation = await createConversation.mutateAsync({
-          vendor_id: vendorId,
+          seller_id: vendorId,
         })
         setState((prev) => ({
           ...prev,

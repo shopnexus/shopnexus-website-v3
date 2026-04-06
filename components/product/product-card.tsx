@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { Heart, Star, ShoppingCart, Check, Loader2 } from "lucide-react"
+import { Heart, Star, ShoppingCart } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -19,8 +19,6 @@ interface ProductCardProps {
 
 export function ProductCard({ product, className }: ProductCardProps) {
   const [isWishlisted, setIsWishlisted] = useState(product.is_favorite ?? false)
-  const [isAddingToCart, setIsAddingToCart] = useState(false)
-  const [justAdded, setJustAdded] = useState(false)
   const [imageError, setImageError] = useState(false)
 
   const discount = product.original_price > product.price
@@ -28,22 +26,6 @@ export function ProductCard({ product, className }: ProductCardProps) {
     : 0
 
   const imageUrl = product.resources?.[0]?.url
-
-  const handleAddToCart = async (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (isAddingToCart || justAdded) return
-
-    setIsAddingToCart(true)
-    // Simulate adding to cart
-    await new Promise(resolve => setTimeout(resolve, 400))
-    setIsAddingToCart(false)
-    setJustAdded(true)
-    toast.success("Added to cart", {
-      description: product.name,
-    })
-    setTimeout(() => setJustAdded(false), 2000)
-  }
 
   const addFavorite = useAddFavorite()
   const removeFavorite = useRemoveFavorite()
@@ -121,49 +103,6 @@ export function ProductCard({ product, className }: ProductCardProps) {
             />
           </Button>
 
-          {/* Quick Add Button - Bottom Right */}
-          <Button
-            size="icon"
-            className={cn(
-              "absolute bottom-2 right-2 h-9 w-9 rounded-full shadow-lg",
-              "opacity-0 group-hover:opacity-100 sm:opacity-0 transition-all duration-200",
-              "translate-y-2 group-hover:translate-y-0",
-              justAdded
-                ? "bg-green-500 hover:bg-green-600"
-                : "bg-primary hover:bg-primary/90"
-            )}
-            onClick={handleAddToCart}
-            disabled={isAddingToCart}
-          >
-            {justAdded ? (
-              <Check className="h-4 w-4 text-white" />
-            ) : isAddingToCart ? (
-              <Loader2 className="h-4 w-4 text-white animate-spin" />
-            ) : (
-              <ShoppingCart className="h-4 w-4 text-white" />
-            )}
-          </Button>
-
-          {/* Mobile Add Button - Always visible on touch devices */}
-          <Button
-            size="icon"
-            className={cn(
-              "absolute bottom-2 right-2 h-8 w-8 rounded-full shadow-md sm:hidden",
-              justAdded
-                ? "bg-green-500 hover:bg-green-600"
-                : "bg-primary/90 hover:bg-primary"
-            )}
-            onClick={handleAddToCart}
-            disabled={isAddingToCart}
-          >
-            {justAdded ? (
-              <Check className="h-3.5 w-3.5 text-white" />
-            ) : isAddingToCart ? (
-              <Loader2 className="h-3.5 w-3.5 text-white animate-spin" />
-            ) : (
-              <ShoppingCart className="h-3.5 w-3.5 text-white" />
-            )}
-          </Button>
         </div>
 
         {/* Content */}

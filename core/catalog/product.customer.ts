@@ -11,7 +11,7 @@ import { Category } from "./category"
 export type TProductDetail = {
   id: string
   slug: string
-  vendor_id: string
+  seller_id: string
   name: string
   description: string
   is_active: boolean
@@ -39,7 +39,7 @@ export type TProductDetail = {
 export type TProductCard = {
   id: string
   slug: string
-  vendor_id: string
+  seller_id: string
   category_id: string
   name: string
   description: string
@@ -74,9 +74,13 @@ export type TRating = {
 export const useListProductCards = (
   params: PaginationParams<{
     search?: string
-    vendor_id?: string
+    seller_id?: string
     category_id?: string[]
     tag?: string[]
+    price_min?: number
+    price_max?: number
+    date_created_from?: number
+    date_created_to?: number
   }>,
   options?: {
     enabled?: boolean

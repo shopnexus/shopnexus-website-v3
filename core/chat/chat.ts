@@ -29,7 +29,7 @@ export type ChatMessage = {
 
 export const useCreateConversation = () =>
   useMutation({
-    mutationFn: async (params: { vendor_id: string }) =>
+    mutationFn: async (params: { seller_id: string }) =>
       customFetchStandard<Conversation>('chat/conversation', {
         method: 'POST',
         body: JSON.stringify(params),
