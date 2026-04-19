@@ -5,10 +5,19 @@ export function cn(...inputs: ClassValue[]) {
 	return twMerge(clsx(inputs))
 }
 
-export function formatPrice(price: number): string {
-	return new Intl.NumberFormat("vi-VN", {
+const currencyLocaleMap: Record<string, string> = {
+	VND: "vi-VN",
+	USD: "en-US",
+	EUR: "de-DE",
+	JPY: "ja-JP",
+	KRW: "ko-KR",
+}
+
+export function formatPrice(price: number, currency: string = "VND"): string {
+	const locale = currencyLocaleMap[currency] || "vi-VN"
+	return new Intl.NumberFormat(locale, {
 		style: "currency",
-		currency: "VND",
+		currency,
 	}).format(price)
 }
 

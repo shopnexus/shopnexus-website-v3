@@ -307,7 +307,7 @@ export default function ProductDetailPage({
 			})
 			setIsBuyNowOpen(false)
 			toast.success("Order placed successfully!", {
-				description: `${product?.name} x${quantity} - ${formatPrice(selectedSku.price * quantity)}`,
+				description: `${product?.name} x${quantity} - ${formatPrice(selectedSku.price * quantity, product?.currency)}`,
 			})
 			router.push("/account/orders")
 		} catch (err: any) {
@@ -512,15 +512,15 @@ export default function ProductDetailPage({
 								)}
 							>
 								{selectedSku
-									? formatPrice(selectedSku.price)
+									? formatPrice(selectedSku.price, product?.currency)
 									: priceRange
-										? `${formatPrice(priceRange.min)} – ${formatPrice(priceRange.max)}`
+										? `${formatPrice(priceRange.min, product?.currency)} – ${formatPrice(priceRange.max, product?.currency)}`
 										: "N/A"}
 							</span>
 							{selectedSku &&
 								selectedSku.original_price > selectedSku.price && (
 									<span className="text-base sm:text-xl text-muted-foreground line-through">
-										{formatPrice(selectedSku.original_price)}
+										{formatPrice(selectedSku.original_price, product?.currency)}
 									</span>
 								)}
 						</div>
@@ -531,6 +531,7 @@ export default function ProductDetailPage({
 									{formatPrice(
 										(selectedSku?.original_price ?? 0) -
 											(selectedSku?.price ?? 0),
+										product?.currency,
 									)}
 								</p>
 							)}
@@ -1052,7 +1053,7 @@ export default function ProductDetailPage({
 							<div className="space-y-2 text-sm">
 								<div className="flex justify-between">
 									<span className="text-muted-foreground">Unit price</span>
-									<span>{formatPrice(selectedSku.price)}</span>
+									<span>{formatPrice(selectedSku.price, product?.currency)}</span>
 								</div>
 								<div className="flex justify-between">
 									<span className="text-muted-foreground">Quantity</span>
@@ -1066,6 +1067,7 @@ export default function ProductDetailPage({
 											{formatPrice(
 												(selectedSku.original_price - selectedSku.price) *
 													quantity,
+												product?.currency,
 											)}
 										</span>
 									</div>
@@ -1074,7 +1076,7 @@ export default function ProductDetailPage({
 								<div className="flex justify-between font-semibold text-base">
 									<span>Total</span>
 									<span className={cn(discount > 0 && "text-red-600")}>
-										{formatPrice(selectedSku.price * quantity)}
+										{formatPrice(selectedSku.price * quantity, product?.currency)}
 									</span>
 								</div>
 							</div>

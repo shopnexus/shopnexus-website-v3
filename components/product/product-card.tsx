@@ -119,11 +119,11 @@ export function ProductCard({ product, className }: ProductCardProps) {
                 "text-base sm:text-lg font-bold",
                 discount > 0 ? "text-red-500" : "text-primary"
               )}>
-                {formatPrice(product.price)}
+                {formatPrice(product.price, product.currency)}
               </span>
               {product.original_price > product.price && (
                 <span className="text-[10px] sm:text-xs text-muted-foreground line-through">
-                  {formatPrice(product.original_price)}
+                  {formatPrice(product.original_price, product.currency)}
                 </span>
               )}
             </div>
@@ -238,7 +238,7 @@ export function ProductCardCompact({ product, className }: ProductCardProps) {
             "text-sm font-bold",
             discount > 0 ? "text-red-500" : "text-primary"
           )}>
-            {formatPrice(product.price)}
+            {formatPrice(product.price, product.currency)}
           </span>
         </CardContent>
       </Card>

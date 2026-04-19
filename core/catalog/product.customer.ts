@@ -15,6 +15,7 @@ export type TProductDetail = {
   name: string
   description: string
   is_active: boolean
+  currency: string
   category: Category
   is_favorite: boolean
   rating: TRating
@@ -44,6 +45,7 @@ export type TProductCard = {
   name: string
   description: string
   is_active: boolean
+  currency: string
   date_created: string
   date_updated: string
   date_deleted: string | null
