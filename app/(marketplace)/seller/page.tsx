@@ -373,7 +373,7 @@ export default function SellerDashboardPage() {
             <div className="text-xs text-muted-foreground">across all products</div>
           </CardContent>
         </Card>
-        {(summary?.pending_actions ?? 0) > 0 && (
+        {((summary?.pending_items ?? 0) + (summary?.pending_refunds ?? 0)) > 0 && (
           <Card className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-amber-700 dark:text-amber-300">
@@ -383,7 +383,7 @@ export default function SellerDashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-amber-700 dark:text-amber-300">
-                {summary?.pending_actions ?? 0}
+                {(summary?.pending_items ?? 0) + (summary?.pending_refunds ?? 0)}
               </div>
               <div className="flex gap-2 text-xs">
                 <Link

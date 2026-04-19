@@ -14,7 +14,8 @@ export type DashboardSummary = {
   total_orders: number
   items_sold: number
   average_rating: number
-  pending_actions: number
+  pending_items: number
+  pending_refunds: number
   comparison: DashboardComparison
 }
 
