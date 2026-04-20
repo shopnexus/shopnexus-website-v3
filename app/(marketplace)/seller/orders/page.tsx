@@ -48,7 +48,8 @@ import {
   Clock,
   AlertTriangle,
 } from "lucide-react"
-import { formatPrice, cn } from "@/lib/utils"
+import { cn } from "@/lib/utils"
+import { Price } from "@/components/ui/price"
 import { toast } from "sonner"
 
 // ===== Shared Helpers =====
@@ -266,8 +267,13 @@ function IncomingTab() {
                           )}
                           <div className="flex items-center gap-4 mt-1 text-sm flex-wrap">
                             <span>Qty: {item.quantity}</span>
-                            <span className="font-medium">{formatPrice(item.unit_price)}/ea</span>
-                            <span className="font-medium">{formatPrice(item.unit_price * item.quantity)} total</span>
+                            {/* TOrderItem has no currency field; fall back to VND */}
+                            <span className="font-medium">
+                              <Price amount={item.unit_price} currency="VND" emphasis="native-only" />/ea
+                            </span>
+                            <span className="font-medium">
+                              <Price amount={item.unit_price * item.quantity} currency="VND" emphasis="native-only" /> total
+                            </span>
                           </div>
                           <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
                             <Badge variant="outline" className="text-xs gap-1">
@@ -276,7 +282,7 @@ function IncomingTab() {
                             </Badge>
                             <span className="flex items-center gap-1">
                               <Truck className="h-3 w-3" />
-                              {item.transport_option} &middot; Est. {formatPrice(item.transport_cost_estimate)}
+                              {item.transport_option} &middot; Est. <Price amount={item.transport_cost_estimate} currency="VND" emphasis="native-only" />
                             </span>
                           </div>
                         </div>
@@ -314,15 +320,19 @@ function IncomingTab() {
               {selectedItems.map((item) => (
                 <div key={item.id} className="flex justify-between gap-4 text-sm">
                   <span className="min-w-0 truncate">{item.sku_name} x{item.quantity}</span>
-                  <span className="font-medium flex-shrink-0">{formatPrice(item.paid_amount)}</span>
+                  <span className="font-medium flex-shrink-0">
+                    <Price amount={item.paid_amount} currency="VND" emphasis="native-only" />
+                  </span>
                 </div>
               ))}
               <div className="flex justify-between pt-1.5 border-t text-sm">
                 <span className="text-muted-foreground">Subtotal (paid)</span>
                 <span>
-                  {formatPrice(
-                    selectedItems.reduce((sum, i) => sum + i.paid_amount, 0)
-                  )}
+                  <Price
+                    amount={selectedItems.reduce((sum, i) => sum + i.paid_amount, 0)}
+                    currency="VND"
+                    emphasis="native-only"
+                  />
                 </span>
               </div>
             </div>
@@ -335,7 +345,7 @@ function IncomingTab() {
                   <Truck className="h-4 w-4 text-muted-foreground" />
                   <span className="font-medium">{selectedItems[0].transport_option}</span>
                   <span className="text-sm text-muted-foreground">
-                    &middot; Est. {formatPrice(selectedItems.reduce((sum, i) => sum + i.transport_cost_estimate, 0))}
+                    &middot; Est. <Price amount={selectedItems.reduce((sum, i) => sum + i.transport_cost_estimate, 0)} currency="VND" emphasis="native-only" />
                   </span>
                 </div>
               </div>
@@ -469,7 +479,13 @@ function ConfirmedTab() {
                       </p>
                       <p className="text-sm">
                         {order.items.length} item{order.items.length !== 1 ? "s" : ""} |
-                        <span className="font-medium ml-1">{formatPrice(order.total)}</span>
+                        <span className="font-medium ml-1">
+                          <Price
+                            amount={order.total}
+                            currency={order.payment?.seller_currency || "VND"}
+                            emphasis="native-only"
+                          />
+                        </span>
                       </p>
                     </div>
 

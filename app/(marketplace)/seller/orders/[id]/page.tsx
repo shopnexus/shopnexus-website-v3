@@ -24,7 +24,7 @@ import {
   Copy,
   ShoppingCart,
 } from "lucide-react"
-import { formatPrice } from "@/lib/utils"
+import { Price } from "@/components/ui/price"
 import { useGetAccount } from "@/core/account/account"
 
 function summarizeOrder(items?: Array<{ sku_name: string }>): string {
@@ -246,7 +246,13 @@ export default function SellerOrderDetailPage({ params }: { params: Promise<{ id
                     )}
                     <div className="flex items-center justify-between mt-2">
                       <span className="text-sm">Qty: {item.quantity}</span>
-                      <span className="font-medium">{formatPrice(item.unit_price * item.quantity)}</span>
+                      <span className="font-medium">
+                        <Price
+                          amount={item.unit_price * item.quantity}
+                          currency={order.payment?.seller_currency || "VND"}
+                          emphasis="native-only"
+                        />
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -350,22 +356,46 @@ export default function SellerOrderDetailPage({ params }: { params: Promise<{ id
             <CardContent className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Subtotal</span>
-                <span>{formatPrice(order.product_cost)}</span>
+                <span>
+                  <Price
+                    amount={order.product_cost}
+                    currency={order.payment?.seller_currency || "VND"}
+                    emphasis="native-only"
+                  />
+                </span>
               </div>
               {order.product_discount > 0 && (
                 <div className="flex justify-between text-sm text-green-600">
                   <span>Discount</span>
-                  <span>-{formatPrice(order.product_discount)}</span>
+                  <span>
+                    -<Price
+                      amount={order.product_discount}
+                      currency={order.payment?.seller_currency || "VND"}
+                      emphasis="native-only"
+                    />
+                  </span>
                 </div>
               )}
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Shipping</span>
-                <span>{formatPrice(order.transport_cost)}</span>
+                <span>
+                  <Price
+                    amount={order.transport_cost}
+                    currency={order.payment?.seller_currency || "VND"}
+                    emphasis="native-only"
+                  />
+                </span>
               </div>
               <Separator className="my-2" />
               <div className="flex justify-between font-medium">
                 <span>Total</span>
-                <span>{formatPrice(order.total)}</span>
+                <span>
+                  <Price
+                    amount={order.total}
+                    currency={order.payment?.seller_currency || "VND"}
+                    emphasis="native-only"
+                  />
+                </span>
               </div>
             </CardContent>
           </Card>
