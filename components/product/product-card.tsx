@@ -7,7 +7,8 @@ import { Heart, Star, ShoppingCart } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { formatPrice, formatSoldCount, cn } from "@/lib/utils"
+import { formatSoldCount, cn } from "@/lib/utils"
+import { Price } from "@/components/ui/price"
 import { TProductCard } from "@/core/catalog/product.customer"
 import { useAddFavorite, useRemoveFavorite } from "@/core/account/favorite"
 import { toast } from "@/components/ui/sonner"
@@ -115,16 +116,23 @@ export function ProductCard({ product, className }: ProductCardProps) {
           {/* Price Section */}
           <div className="mt-1.5 sm:mt-2">
             <div className="flex items-baseline gap-1.5 flex-wrap">
-              <span className={cn(
-                "text-base sm:text-lg font-bold",
-                discount > 0 ? "text-red-500" : "text-primary"
-              )}>
-                {formatPrice(product.price, product.currency)}
-              </span>
+              <Price
+                amount={product.price}
+                currency={product.currency}
+                emphasis="preferred"
+                className={cn(
+                  "text-base sm:text-lg font-bold",
+                  discount > 0 ? "text-red-500" : "text-primary"
+                )}
+              />
               {product.original_price > product.price && (
-                <span className="text-[10px] sm:text-xs text-muted-foreground line-through">
-                  {formatPrice(product.original_price, product.currency)}
-                </span>
+                <Price
+                  amount={product.original_price}
+                  currency={product.currency}
+                  emphasis="preferred"
+                  hideConverted
+                  className="text-[10px] sm:text-xs text-muted-foreground line-through"
+                />
               )}
             </div>
           </div>
@@ -234,12 +242,15 @@ export function ProductCardCompact({ product, className }: ProductCardProps) {
         </div>
         <CardContent className="p-2">
           <h3 className="text-xs line-clamp-1 mb-1">{product.name}</h3>
-          <span className={cn(
-            "text-sm font-bold",
-            discount > 0 ? "text-red-500" : "text-primary"
-          )}>
-            {formatPrice(product.price, product.currency)}
-          </span>
+          <Price
+            amount={product.price}
+            currency={product.currency}
+            emphasis="preferred"
+            className={cn(
+              "text-sm font-bold",
+              discount > 0 ? "text-red-500" : "text-primary"
+            )}
+          />
         </CardContent>
       </Card>
     </Link>
