@@ -29,13 +29,20 @@ export function CartSheet({ onClose }: CartSheetProps) {
 	// Subtotal always shown in the preferred currency. Per-line items still
 	// display their native price via <Price> so the buyer sees what the
 	// seller is charging.
-	const subtotalPreferred = rateData
-		? items.reduce(
-				(sum, i) =>
-					sum +
-					convertMoney(i.sku.price * i.quantity, i.currency, preferred, rateData.rates),
-				0,
-			)
+	// null when rateData missing OR any item's currency can't be converted —
+	// callers must guard before display (conversion-failure UX: show nothing
+	// rather than a silently wrong total).
+	const subtotalPreferred: number | null = rateData
+		? items.reduce<number | null>((sum, i) => {
+				if (sum === null) return null
+				const c = convertMoney(
+					i.sku.price * i.quantity,
+					i.currency,
+					preferred,
+					rateData.rates,
+				)
+				return c === null ? null : sum + c
+			}, 0)
 		: null
 
 	const handleUpdateQuantity = (skuId: string, delta: number) => {

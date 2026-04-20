@@ -37,11 +37,13 @@ export function Price({
     !sameCurrency && ratesReady && !hideConverted && emphasis !== "native-only"
 
   const native = formatMoney(amount, currency)
-  const converted = showBoth
-    ? formatMoney(convertMoney(amount, currency, preferred, rateData.rates), preferred)
+  const convertedAmount = showBoth
+    ? convertMoney(amount, currency, preferred, rateData!.rates)
     : null
+  const converted =
+    convertedAmount !== null ? formatMoney(convertedAmount, preferred) : null
 
-  if (!showBoth) {
+  if (!showBoth || converted === null) {
     return <span className={className}>{native}</span>
   }
 

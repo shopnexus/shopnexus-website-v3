@@ -164,17 +164,53 @@ export default function CheckoutPage() {
   // parens per item. Subtotal/total collapse to a single preferred-currency
   // number so the summary stays readable for mixed-currency carts.
   const cartItems = cart ?? []
-  const cartSubtotalPreferred = rateData
-    ? cartItems.reduce(
-        (sum, i) =>
-          sum +
-          convertMoney(i.sku.price * i.quantity, i.currency, preferred, rateData.rates),
-        0,
+
+  // Summary values carry their display currency: we show in `preferred`
+  // when every item converts, else fall back to native VND so the buyer
+  // isn't shown a silently-wrong total (see money.ts convertMoney null
+  // contract).
+  type DisplayAmount = { amount: number; currency: string }
+
+  const cartSubtotalDisplay: DisplayAmount = (() => {
+    if (!rateData) return { amount: subtotal, currency: "VND" }
+    const converted = cartItems.reduce<number | null>((sum, i) => {
+      if (sum === null) return null
+      const c = convertMoney(
+        i.sku.price * i.quantity,
+        i.currency,
+        preferred,
+        rateData.rates,
       )
-    : subtotal
-  const walletPreferred = rateData && preferred !== "VND"
-    ? convertMoney(walletDeduction, "VND", preferred, rateData.rates)
-    : walletDeduction
+      return c === null ? null : sum + c
+    }, 0)
+    return converted !== null
+      ? { amount: converted, currency: preferred }
+      : { amount: subtotal, currency: "VND" }
+  })()
+
+  const walletDisplay: DisplayAmount = (() => {
+    if (cartSubtotalDisplay.currency === "VND") {
+      return { amount: walletDeduction, currency: "VND" }
+    }
+    const c =
+      rateData && preferred !== "VND"
+        ? convertMoney(walletDeduction, "VND", preferred, rateData.rates)
+        : walletDeduction
+    return c !== null
+      ? { amount: c, currency: preferred }
+      : { amount: walletDeduction, currency: "VND" }
+  })()
+
+  // If summary and wallet diverge on currency (one converted, one didn't),
+  // collapse everything to VND native so the math stays consistent.
+  const summaryCurrency =
+    cartSubtotalDisplay.currency === walletDisplay.currency
+      ? cartSubtotalDisplay.currency
+      : "VND"
+  const cartSubtotalPreferred =
+    summaryCurrency === "VND" ? subtotal : cartSubtotalDisplay.amount
+  const walletPreferred =
+    summaryCurrency === "VND" ? walletDeduction : walletDisplay.amount
   const estimatedTotalPreferred =
     cartSubtotalPreferred + estimatedShipping - walletPreferred
 
@@ -496,7 +532,7 @@ export default function CheckoutPage() {
                   Processing...
                 </>
               ) : (
-                `Pay ${formatMoney(estimatedTotalPreferred, preferred)}`
+                `Pay ${formatMoney(estimatedTotalPreferred, summaryCurrency)}`
               )}
             </Button>
           </div>
@@ -560,7 +596,7 @@ export default function CheckoutPage() {
                   <span className="text-muted-foreground">
                     Products ({itemCount} items)
                   </span>
-                  <span>{formatMoney(cartSubtotalPreferred, preferred)}</span>
+                  <span>{formatMoney(cartSubtotalPreferred, summaryCurrency)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Estimated shipping</span>
@@ -573,13 +609,13 @@ export default function CheckoutPage() {
                 {useWallet && walletDeduction > 0 && (
                   <div className="flex justify-between text-sm text-green-600">
                     <span>Wallet deduction</span>
-                    <span>−{formatMoney(walletPreferred, preferred)}</span>
+                    <span>−{formatMoney(walletPreferred, summaryCurrency)}</span>
                   </div>
                 )}
                 <Separator />
                 <div className="flex justify-between font-semibold text-lg">
                   <span>Estimated Total</span>
-                  <span>{formatMoney(estimatedTotalPreferred, preferred)}</span>
+                  <span>{formatMoney(estimatedTotalPreferred, summaryCurrency)}</span>
                 </div>
               </div>
 
@@ -596,7 +632,7 @@ export default function CheckoutPage() {
                     Processing...
                   </>
                 ) : (
-                  `Pay ${formatMoney(estimatedTotalPreferred, preferred)}`
+                  `Pay ${formatMoney(estimatedTotalPreferred, summaryCurrency)}`
                 )}
               </Button>
             </CardContent>

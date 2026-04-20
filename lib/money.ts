@@ -2,13 +2,32 @@
 // All amounts are integers in the smallest unit of their currency
 // (e.g. 299000 = ₫299,000; 1250 = $12.50).
 
-const DECIMALS: Record<string, number> = {
-  VND: 0, USD: 2, JPY: 0, KRW: 0, EUR: 2,
-  GBP: 2, CNY: 2, SGD: 2, THB: 2, AUD: 2,
+// Cache Intl.NumberFormat instances per currency. Constructing an NF is ~0.1ms
+// but adds up when formatting price lists; cached instances reuse the
+// runtime's internal pattern parsing.
+const formatterCache = new Map<string, Intl.NumberFormat>()
+
+function getFormatter(currency: string, locale?: string): Intl.NumberFormat {
+  const key = `${locale ?? ""}::${currency}`
+  let fmt = formatterCache.get(key)
+  if (!fmt) {
+    fmt = new Intl.NumberFormat(locale, { style: "currency", currency })
+    formatterCache.set(key, fmt)
+  }
+  return fmt
 }
 
-const getDecimals = (currency: string): number =>
-  DECIMALS[currency] ?? 2
+// getDecimals returns the ISO 4217 minor-unit exponent via CLDR data
+// (e.g. VND=0, USD=2, JPY=0, BHD=3, CLF=4). Falls back to 2 for unknown codes.
+function getDecimals(currency: string): number {
+  try {
+    return (
+      getFormatter(currency).resolvedOptions().maximumFractionDigits ?? 2
+    )
+  } catch {
+    return 2
+  }
+}
 
 /**
  * Format a smallest-unit integer as a localized currency string.
@@ -21,30 +40,27 @@ export function formatMoney(
 ): string {
   const decimals = getDecimals(currency)
   const major = amount / Math.pow(10, decimals)
-  return new Intl.NumberFormat(locale, {
-    style: "currency",
-    currency,
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(major)
+  return getFormatter(currency, locale).format(major)
 }
 
 /**
  * Convert an amount between currencies using USD-based rates. Returns
- * integer smallest-unit in the target currency. Returns original unchanged
- * if either rate is missing (fail-open: display native rather than lying).
+ * integer smallest-unit in the target currency, or `null` if either rate
+ * is missing. Callers must handle null by showing the native currency
+ * only — returning the original amount would silently mis-scale it
+ * through the target's decimals (e.g. ₫694 → "MX$6.94").
  */
 export function convertMoney(
   amount: number,
   from: string,
   to: string,
   ratesFromUSD: Record<string, number>,
-): number {
+): number | null {
   if (from === to) return amount
 
   const rateFrom = from === "USD" ? 1 : ratesFromUSD[from]
   const rateTo = to === "USD" ? 1 : ratesFromUSD[to]
-  if (!rateFrom || !rateTo) return amount
+  if (!rateFrom || !rateTo) return null
 
   const decFrom = getDecimals(from)
   const decTo = getDecimals(to)
@@ -86,10 +102,9 @@ export function formatPriceInline(
 ): string {
   const native = formatMoney(amount, currency)
   if (!rates || currency === preferred) return native
-  const converted = formatMoney(
-    convertMoney(amount, currency, preferred, rates),
-    preferred,
-  )
+  const conv = convertMoney(amount, currency, preferred, rates)
+  if (conv === null) return native
+  const converted = formatMoney(conv, preferred)
   return emphasis === "preferred"
     ? `${converted} (${native})`
     : `${native} (${converted})`

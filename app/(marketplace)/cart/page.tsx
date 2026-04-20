@@ -37,13 +37,20 @@ export default function CartPage() {
   const itemCount = items.reduce((acc, item) => acc + item.quantity, 0)
   // Subtotal always in preferred currency; per-line items display native
   // price via <Price>.
-  const subtotalPreferred = rateData
-    ? items.reduce(
-        (sum, i) =>
-          sum +
-          convertMoney(i.sku.price * i.quantity, i.currency, preferred, rateData.rates),
-        0,
-      )
+  // null when rateData missing OR any item's currency can't be converted —
+  // callers must guard before display (conversion-failure UX: show nothing
+  // rather than a silently wrong total).
+  const subtotalPreferred: number | null = rateData
+    ? items.reduce<number | null>((sum, i) => {
+        if (sum === null) return null
+        const c = convertMoney(
+          i.sku.price * i.quantity,
+          i.currency,
+          preferred,
+          rateData.rates,
+        )
+        return c === null ? null : sum + c
+      }, 0)
     : null
 
   const handleUpdateQuantity = (skuId: string, delta: number) => {
