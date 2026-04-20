@@ -4,9 +4,8 @@ import Link from "next/link"
 import Image from "next/image"
 import { useRequireAuth } from "@/core/account/auth"
 import { useGetCart, useUpdateCart, useClearCart } from "@/core/order/cart"
-import { Price } from "@/components/ui/price"
 import { useExchangeRates, usePreferredCurrency } from "@/core/common/currency"
-import { convertMoney, formatMoney } from "@/lib/money"
+import { convertMoney, formatMoney, formatPriceInline } from "@/lib/money"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -35,13 +34,17 @@ export default function CartPage() {
   const { data: rateData } = useExchangeRates()
 
   const items = cart ?? []
-  const cartGroups = items.reduce<Record<string, number>>((acc, i) => {
-    const c = i.currency
-    acc[c] = (acc[c] ?? 0) + i.sku.price * i.quantity
-    return acc
-  }, {})
-  const cartCurrencies = Object.keys(cartGroups)
   const itemCount = items.reduce((acc, item) => acc + item.quantity, 0)
+  // Subtotal always in preferred currency; per-line items display native
+  // price via <Price>.
+  const subtotalPreferred = rateData
+    ? items.reduce(
+        (sum, i) =>
+          sum +
+          convertMoney(i.sku.price * i.quantity, i.currency, preferred, rateData.rates),
+        0,
+      )
+    : null
 
   const handleUpdateQuantity = (skuId: string, delta: number) => {
     updateCart.mutate({ sku_id: skuId, delta_quantity: delta })
@@ -131,21 +134,22 @@ export default function CartPage() {
                             </p>
                           </div>
                           <div className="text-right">
-                            <Price
-                              amount={item.sku.price * item.quantity}
-                              currency={item.currency}
-                              emphasis="preferred"
-                              hideConverted
-                              className="font-semibold"
-                            />
+                            <span className="font-semibold">
+                              {formatPriceInline(
+                                item.sku.price * item.quantity,
+                                item.currency,
+                                preferred,
+                                rateData?.rates,
+                              )}
+                            </span>
                             {item.quantity > 1 && (
                               <p className="text-sm text-muted-foreground">
-                                <Price
-                                  amount={item.sku.price}
-                                  currency={item.currency}
-                                  emphasis="preferred"
-                                  hideConverted
-                                />{" "}
+                                {formatPriceInline(
+                                  item.sku.price,
+                                  item.currency,
+                                  preferred,
+                                  rateData?.rates,
+                                )}{" "}
                                 each
                               </p>
                             )}
@@ -213,32 +217,13 @@ export default function CartPage() {
 
                 {/* Totals */}
                 <div className="space-y-2">
-                  <div className="flex justify-between items-start text-sm">
+                  <div className="flex justify-between items-center text-sm">
                     <span className="text-muted-foreground">Subtotal</span>
-                    <div className="flex flex-col items-end gap-1">
-                      {cartCurrencies.map((c) => (
-                        <Price
-                          key={c}
-                          amount={cartGroups[c]}
-                          currency={c}
-                          emphasis="preferred"
-                        />
-                      ))}
-                      {cartCurrencies.length > 1 && rateData && (
-                        <span className="text-xs text-muted-foreground">
-                          Grand total ≈{" "}
-                          {formatMoney(
-                            cartCurrencies.reduce(
-                              (sum, c) =>
-                                sum +
-                                convertMoney(cartGroups[c], c, preferred, rateData.rates),
-                              0,
-                            ),
-                            preferred,
-                          )}
-                        </span>
-                      )}
-                    </div>
+                    <span>
+                      {subtotalPreferred !== null
+                        ? formatMoney(subtotalPreferred, preferred)
+                        : "—"}
+                    </span>
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Shipping calculated at checkout
@@ -247,33 +232,13 @@ export default function CartPage() {
 
                 <Separator />
 
-                <div className="flex justify-between items-start font-semibold text-lg">
+                <div className="flex justify-between items-center font-semibold text-lg">
                   <span>Subtotal</span>
-                  <div className="flex flex-col items-end gap-1">
-                    {cartCurrencies.map((c) => (
-                      <Price
-                        key={c}
-                        amount={cartGroups[c]}
-                        currency={c}
-                        emphasis="preferred"
-                        className="font-semibold"
-                      />
-                    ))}
-                    {cartCurrencies.length > 1 && rateData && (
-                      <span className="text-xs text-muted-foreground font-normal">
-                        Grand total ≈{" "}
-                        {formatMoney(
-                          cartCurrencies.reduce(
-                            (sum, c) =>
-                              sum +
-                              convertMoney(cartGroups[c], c, preferred, rateData.rates),
-                            0,
-                          ),
-                          preferred,
-                        )}
-                      </span>
-                    )}
-                  </div>
+                  <span>
+                    {subtotalPreferred !== null
+                      ? formatMoney(subtotalPreferred, preferred)
+                      : "—"}
+                  </span>
                 </div>
 
                 <Button size="lg" className="w-full" asChild>

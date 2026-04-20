@@ -32,12 +32,17 @@ import {
   Inbox,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { Price } from "@/components/ui/price"
+import { useExchangeRates, usePreferredCurrency } from "@/core/common/currency"
+import { formatPriceInline } from "@/lib/money"
 import { toast } from "sonner"
 
 // ===== Pending Items Section =====
 
 function PendingItemCard({ item, onCancel }: { item: TOrderItem; onCancel: (id: number) => void }) {
+  const preferred = usePreferredCurrency()
+  const { data: rateData } = useExchangeRates()
+  const fmt = (amount: number) =>
+    formatPriceInline(amount, "VND", preferred, rateData?.rates, "native")
   const badgeLabel = "Awaiting Seller"
   const badgeColor = "bg-yellow-100 text-yellow-800"
 
@@ -55,13 +60,7 @@ function PendingItemCard({ item, onCancel }: { item: TOrderItem; onCancel: (id: 
           <div className="flex-1 min-w-0">
             <ProductLink spuId={item.spu_id}>{item.sku_name}</ProductLink>
             <p className="text-sm text-muted-foreground inline-flex items-center gap-1">
-              Qty: {item.quantity} x{" "}
-              <Price
-                amount={item.unit_price}
-                currency="VND"
-                emphasis="native"
-                showRateHint
-              />
+              Qty: {item.quantity} x {fmt(item.unit_price)}
             </p>
             {item.note && (
               <p className="text-sm text-muted-foreground truncate">{item.note}</p>
@@ -72,13 +71,9 @@ function PendingItemCard({ item, onCancel }: { item: TOrderItem; onCancel: (id: 
               <Clock className="h-3 w-3" />
               {badgeLabel}
             </Badge>
-            <Price
-              amount={item.unit_price * item.quantity}
-              currency="VND"
-              emphasis="native"
-              showRateHint
-              className="text-sm font-medium"
-            />
+            <span className="text-sm font-medium">
+              {fmt(item.unit_price * item.quantity)}
+            </span>
             {!item.order_id && !item.date_cancelled && (
               <Button variant="ghost" size="sm" className="text-destructive h-7 px-2" onClick={() => onCancel(item.id)}>
                 Cancel

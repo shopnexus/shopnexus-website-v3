@@ -4,7 +4,8 @@ import { useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { TOrder } from "@/core/order/order.buyer"
-import { Price } from "@/components/ui/price"
+import { useExchangeRates, usePreferredCurrency } from "@/core/common/currency"
+import { formatPriceInline } from "@/lib/money"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -46,6 +47,16 @@ export function OrderList({
   onLoadMore?: () => void
 }) {
   const [reviewingOrder, setReviewingOrder] = useState<{ orderId: string; spuId: string } | null>(null)
+  const preferred = usePreferredCurrency()
+  const { data: rateData } = useExchangeRates()
+  const fmtInOrder = (order: TOrder, amount: number) =>
+    formatPriceInline(
+      amount,
+      order.payment?.seller_currency || "VND",
+      preferred,
+      rateData?.rates,
+      "native",
+    )
 
   if (isLoading) {
     return (
@@ -140,13 +151,7 @@ export function OrderList({
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{item.sku_name}</p>
                     <p className="text-sm text-muted-foreground inline-flex items-center gap-1">
-                      Qty: {item.quantity} x{" "}
-                      <Price
-                        amount={item.unit_price}
-                        currency={order.payment?.seller_currency || "VND"}
-                        emphasis="native"
-                        showRateHint
-                      />
+                      Qty: {item.quantity} x {fmtInOrder(order, item.unit_price)}
                     </p>
                   </div>
                 </div>
@@ -162,13 +167,9 @@ export function OrderList({
             <div className="flex items-center justify-between mt-4 pt-4 border-t">
               <div>
                 <p className="text-sm text-muted-foreground">Total</p>
-                <Price
-                  amount={order.total}
-                  currency={order.payment?.seller_currency || "VND"}
-                  emphasis="native"
-                  showRateHint
-                  className="font-semibold"
-                />
+                <span className="font-semibold">
+                  {fmtInOrder(order, order.total)}
+                </span>
               </div>
               <div className="flex gap-2">
                 {order.payment?.status === "Success" && order.transport?.status === "Delivered" && order.items[0] && (

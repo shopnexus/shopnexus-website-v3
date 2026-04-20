@@ -70,18 +70,27 @@ export function getCurrencyName(currency: string, locale?: string): string {
 }
 
 /**
- * Inline string formatter for non-JSX contexts (toasts, button labels).
- * Mirrors <Price> behavior but returns plain text. When currencies differ
- * and rates are available, returns "$X (≈ ₫Y)".
+ * Inline string formatter for non-JSX contexts (toasts, button labels,
+ * cart rows). Emits "PRIMARY (SECONDARY)" where primary depends on emphasis:
+ *   - "preferred" (default — browse/cart/product): converted first, native in parens
+ *   - "native" (checkout / Pay buttons): native first, converted in parens
+ * When rates are unavailable or currency already matches preferred, returns
+ * the native string only.
  */
 export function formatPriceInline(
   amount: number,
   currency: string,
   preferred: string,
   rates: Record<string, number> | undefined,
+  emphasis: "preferred" | "native" = "preferred",
 ): string {
   const native = formatMoney(amount, currency)
   if (!rates || currency === preferred) return native
-  const converted = convertMoney(amount, currency, preferred, rates)
-  return `${native} (≈ ${formatMoney(converted, preferred)})`
+  const converted = formatMoney(
+    convertMoney(amount, currency, preferred, rates),
+    preferred,
+  )
+  return emphasis === "preferred"
+    ? `${converted} (${native})`
+    : `${native} (${converted})`
 }

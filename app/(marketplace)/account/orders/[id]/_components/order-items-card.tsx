@@ -1,9 +1,10 @@
 "use client"
 
 import Image from "next/image"
-import { Price } from "@/components/ui/price"
 import { ProductLink } from "@/components/product/product-link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useExchangeRates, usePreferredCurrency } from "@/core/common/currency"
+import { formatPriceInline } from "@/lib/money"
 import { Package } from "lucide-react"
 
 interface OrderItemsCardProps {
@@ -21,6 +22,8 @@ interface OrderItemsCardProps {
 }
 
 export function OrderItemsCard({ items, currency }: OrderItemsCardProps) {
+	const preferred = usePreferredCurrency()
+	const { data: rateData } = useExchangeRates()
 	return (
 		<Card>
 			<CardHeader>
@@ -58,13 +61,15 @@ export function OrderItemsCard({ items, currency }: OrderItemsCardProps) {
 								<p className="text-sm text-muted-foreground">
 									Qty: {item.quantity}
 								</p>
-								<Price
-									amount={item.unit_price * item.quantity}
-									currency={currency}
-									emphasis="native"
-									showRateHint
-									className="font-medium"
-								/>
+								<span className="font-medium">
+									{formatPriceInline(
+										item.unit_price * item.quantity,
+										currency,
+										preferred,
+										rateData?.rates,
+										"native",
+									)}
+								</span>
 							</div>
 						</div>
 					</div>

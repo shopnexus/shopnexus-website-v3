@@ -47,12 +47,17 @@ export function Price({
 
   const primary = emphasis === "preferred" ? converted : native
   const secondary = emphasis === "preferred" ? native : converted
+  // For "preferred" emphasis the secondary IS the original price the buyer
+  // is charged in. For "native" emphasis the secondary is an approximation
+  // in the buyer's preferred currency.
+  const secondaryLabel =
+    emphasis === "preferred" ? "(original price)" : `(in ${preferred})`
 
   return (
     <span className={cn("inline-flex flex-col leading-tight", className)}>
       <span className="font-semibold">{primary}</span>
       <span className="text-xs text-muted-foreground font-normal">
-        ≈ {secondary}
+        {secondary} <span className="opacity-70">{secondaryLabel}</span>
         {showRateHint && <span className="ml-1 opacity-60"> at current rate</span>}
       </span>
     </span>

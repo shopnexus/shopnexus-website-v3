@@ -6,9 +6,8 @@ import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Minus, Plus, Trash2, ShoppingBag } from "lucide-react"
 import { useGetCart, useUpdateCart, useClearCart } from "@/core/order/cart"
-import { Price } from "@/components/ui/price"
 import { useExchangeRates, usePreferredCurrency } from "@/core/common/currency"
-import { convertMoney, formatMoney } from "@/lib/money"
+import { convertMoney, formatMoney, formatPriceInline } from "@/lib/money"
 import Image from "next/image"
 import Link from "next/link"
 import { toast } from "@/components/ui/sonner"
@@ -26,13 +25,18 @@ export function CartSheet({ onClose }: CartSheetProps) {
 	const { data: rateData } = useExchangeRates()
 
 	const items = cart ?? []
-	const cartGroups = items.reduce<Record<string, number>>((acc, i) => {
-		const c = i.currency
-		acc[c] = (acc[c] ?? 0) + i.sku.price * i.quantity
-		return acc
-	}, {})
-	const cartCurrencies = Object.keys(cartGroups)
 	const itemCount = items.reduce((acc, item) => acc + item.quantity, 0)
+	// Subtotal always shown in the preferred currency. Per-line items still
+	// display their native price via <Price> so the buyer sees what the
+	// seller is charging.
+	const subtotalPreferred = rateData
+		? items.reduce(
+				(sum, i) =>
+					sum +
+					convertMoney(i.sku.price * i.quantity, i.currency, preferred, rateData.rates),
+				0,
+			)
+		: null
 
 	const handleUpdateQuantity = (skuId: string, delta: number) => {
 		updateCart.mutate(
@@ -113,13 +117,14 @@ export function CartSheet({ onClose }: CartSheetProps) {
 												"Product"}
 										</h4>
 										<div className="flex items-center gap-2 mt-1">
-											<Price
-												amount={item.sku.price}
-												currency={item.currency}
-												emphasis="preferred"
-												hideConverted
-												className="font-semibold text-sm"
-											/>
+											<span className="font-semibold text-sm">
+												{formatPriceInline(
+													item.sku.price,
+													item.currency,
+													preferred,
+													rateData?.rates,
+												)}
+											</span>
 										</div>
 										<div className="flex items-center justify-between mt-2">
 											<div className="flex items-center gap-1">
@@ -163,33 +168,13 @@ export function CartSheet({ onClose }: CartSheetProps) {
 
 					<div className="space-y-4 p-4">
 						<Separator />
-						<div className="flex items-start justify-between">
+						<div className="flex items-center justify-between">
 							<span className="text-muted-foreground">Subtotal</span>
-							<div className="flex flex-col items-end gap-1">
-								{cartCurrencies.map((c) => (
-									<Price
-										key={c}
-										amount={cartGroups[c]}
-										currency={c}
-										emphasis="preferred"
-										className="font-semibold"
-									/>
-								))}
-								{cartCurrencies.length > 1 && rateData && (
-									<span className="text-xs text-muted-foreground">
-										Grand total ≈{" "}
-										{formatMoney(
-											cartCurrencies.reduce(
-												(sum, c) =>
-													sum +
-													convertMoney(cartGroups[c], c, preferred, rateData.rates),
-												0,
-											),
-											preferred,
-										)}
-									</span>
-								)}
-							</div>
+							<span className="font-semibold">
+								{subtotalPreferred !== null
+									? formatMoney(subtotalPreferred, preferred)
+									: "—"}
+							</span>
 						</div>
 						<p className="text-xs text-muted-foreground">
 							Shipping and taxes calculated at checkout.
