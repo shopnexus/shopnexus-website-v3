@@ -57,7 +57,8 @@ core/                       # TanStack Query hooks and API layer
 └── common/                 # Shared types (Resource, etc.)
 
 lib/
-└── utils.ts                # Utility functions (cn, formatPrice)
+└── utils.ts                # Utility functions (cn, formatDate, formatSoldCount, formatTimeAgo)
+└── money.ts                # Money utilities (formatMoney, convertMoney, formatPriceInline)
 ```
 
 ### Path Aliases
@@ -89,10 +90,23 @@ updateCart.mutate({ sku_id: "...", quantity: 0 })
 ```
 
 #### Price Formatting
-```typescript
-import { formatPrice } from "@/lib/utils"
-formatPrice(29.99) // "$29.99"
+```tsx
+<Price amount={2999} currency="USD" />
+// or, for non-JSX:
+formatPriceInline(2999, "USD", "VND", rates)
 ```
+
+### Currency
+
+- Money: `@/lib/money` — `formatMoney`, `convertMoney`, `getCurrencyName`, `formatPriceInline` (Intl-based, zero dep)
+- Hooks: `@/core/common/currency` — `useExchangeRates`, `usePreferredCurrency`, `useUpdatePreferredCurrency`
+- Component: `@/components/ui/price` — `<Price amount={} currency={} emphasis={} />`
+- Currency picker: `@/components/ui/currency-picker` — `<CurrencyPicker value={} supported={} onChange={} />`
+
+Emphasis rules:
+- `"preferred"` (default): browse/cart — buyer sees preferred currency as primary
+- `"native"`: checkout/order/wallet — native currency is primary (what user is charged)
+- `"native-only"`: seller dashboards — no conversion, native only
 
 ### shadcn/ui Configuration
 The project uses shadcn/ui with:
