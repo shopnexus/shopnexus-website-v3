@@ -12,7 +12,14 @@ import { useGetMe } from "@/core/account/account"
 import { useListServiceOption } from "@/core/common/option"
 import { useListPaymentMethods } from "@/core/account/payment-method"
 import { useGetWalletBalance } from "@/core/account/wallet"
-import { formatPrice } from "@/lib/utils"
+import { Price } from "@/components/ui/price"
+import {
+  formatPriceInline,
+  formatMoney,
+  convertMoney,
+  getCurrencyName,
+} from "@/lib/money"
+import { useExchangeRates, usePreferredCurrency } from "@/core/common/currency"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -53,6 +60,8 @@ export default function CheckoutPage() {
   const { data: paymentOptions } = useListServiceOption({ category: "payment" })
   const { data: paymentMethods } = useListPaymentMethods()
   const { data: walletData } = useGetWalletBalance()
+  const preferred = usePreferredCurrency()
+  const { data: rateData } = useExchangeRates()
 
   const checkoutMutation = useBuyerCheckout()
 
@@ -142,6 +151,16 @@ export default function CheckoutPage() {
   const isLoading = cartLoading || contactsLoading
   const itemCount = cart?.reduce((acc, item) => acc + item.quantity, 0) ?? 0
   const subtotal = cart?.reduce((acc, item) => acc + item.sku.price * item.quantity, 0) ?? 0
+
+  // Group cart totals by currency (cart items can span multiple seller currencies).
+  const cartItems = cart ?? []
+  const cartGroups = cartItems.reduce<Record<string, number>>((acc, i) => {
+    const c = i.currency
+    acc[c] = (acc[c] ?? 0) + i.sku.price * i.quantity
+    return acc
+  }, {})
+  const cartCurrencies = Object.keys(cartGroups)
+  const primaryCurrency = cartCurrencies.length === 1 ? cartCurrencies[0] : ""
 
   // Estimate shipping cost (simple heuristic: count items with transport selected)
   const estimatedShipping = useMemo(() => {
@@ -321,9 +340,12 @@ export default function CheckoutPage() {
                       </Select>
                     </div>
                   </div>
-                  <p className="font-medium flex-shrink-0">
-                    {formatPrice(item.sku.price * item.quantity)}
-                  </p>
+                  <Price
+                    amount={item.sku.price * item.quantity}
+                    currency={item.currency}
+                    emphasis="native"
+                    className="font-medium flex-shrink-0"
+                  />
                 </div>
               ))}
             </CardContent>
@@ -427,13 +449,25 @@ export default function CheckoutPage() {
                 />
                 <div className="flex-1">
                   <span className="font-medium">Use wallet balance</span>
-                  <p className="text-sm text-muted-foreground">
-                    Available balance: {formatPrice(walletBalance)}
+                  <p className="text-sm text-muted-foreground flex items-center gap-1">
+                    Available balance:{" "}
+                    <Price
+                      amount={walletBalance}
+                      currency="VND"
+                      emphasis="native"
+                      hideConverted={preferred === "VND"}
+                    />
                   </p>
                 </div>
                 {useWallet && walletDeduction > 0 && (
-                  <span className="text-sm font-medium text-green-600">
-                    -{formatPrice(walletDeduction)}
+                  <span className="text-sm font-medium text-green-600 inline-flex items-center gap-0.5">
+                    -
+                    <Price
+                      amount={walletDeduction}
+                      currency="VND"
+                      emphasis="native"
+                      hideConverted={preferred === "VND"}
+                    />
                   </span>
                 )}
               </Label>
@@ -441,21 +475,38 @@ export default function CheckoutPage() {
           </Card>
 
           {/* Checkout Button (mobile) */}
-          <Button
-            size="lg"
-            className="w-full lg:hidden"
-            disabled={!canCheckout || checkoutMutation.isPending}
-            onClick={handleCheckout}
-          >
-            {checkoutMutation.isPending ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Processing...
-              </>
-            ) : (
-              `Pay ${formatPrice(estimatedTotal)}`
+          <div className="lg:hidden space-y-2">
+            {primaryCurrency && primaryCurrency !== preferred && (
+              <p className="text-xs text-muted-foreground">
+                You will be charged in {primaryCurrency} ({getCurrencyName(primaryCurrency)})
+              </p>
             )}
-          </Button>
+            {cartCurrencies.length > 1 && (
+              <p className="text-xs text-muted-foreground">
+                Items from multiple sellers — each will charge in its own currency
+              </p>
+            )}
+            <Button
+              size="lg"
+              className="w-full"
+              disabled={!canCheckout || checkoutMutation.isPending}
+              onClick={handleCheckout}
+            >
+              {checkoutMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                `Pay ${formatPriceInline(
+                  estimatedTotal,
+                  primaryCurrency || "VND",
+                  preferred,
+                  rateData?.rates,
+                )}`
+              )}
+            </Button>
+          </div>
         </div>
 
         {/* Order Summary Sidebar */}
@@ -491,9 +542,13 @@ export default function CheckoutPage() {
                         {item.sku.attributes?.map((a) => a.value).join(" / ") || "Product"}
                       </p>
                     </div>
-                    <p className="text-sm font-medium">
-                      {formatPrice(item.sku.price * item.quantity)}
-                    </p>
+                    <Price
+                      amount={item.sku.price * item.quantity}
+                      currency={item.currency}
+                      emphasis="native"
+                      hideConverted
+                      className="text-sm font-medium"
+                    />
                   </div>
                 ))}
                 {cart.length > 3 && (
@@ -507,26 +562,103 @@ export default function CheckoutPage() {
 
               {/* Pricing */}
               <div className="space-y-2">
-                <div className="flex justify-between text-sm">
+                <div className="flex justify-between items-start text-sm">
                   <span className="text-muted-foreground">Products ({itemCount} items)</span>
-                  <span>{formatPrice(subtotal)}</span>
+                  <div className="flex flex-col items-end gap-1">
+                    {cartCurrencies.map((c) => (
+                      <Price
+                        key={c}
+                        amount={cartGroups[c]}
+                        currency={c}
+                        emphasis="native"
+                      />
+                    ))}
+                    {cartCurrencies.length > 1 && rateData && (
+                      <span className="text-xs text-muted-foreground">
+                        ≈{" "}
+                        {formatMoney(
+                          cartCurrencies.reduce(
+                            (sum, c) =>
+                              sum +
+                              convertMoney(cartGroups[c], c, preferred, rateData.rates),
+                            0,
+                          ),
+                          preferred,
+                        )}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Estimated shipping</span>
-                  <span>{estimatedShipping > 0 ? formatPrice(estimatedShipping) : "Calculated at confirmation"}</span>
+                  <span>
+                    {estimatedShipping > 0 ? (
+                      <Price
+                        amount={estimatedShipping}
+                        currency={primaryCurrency || "VND"}
+                        emphasis="native"
+                      />
+                    ) : (
+                      "Calculated at confirmation"
+                    )}
+                  </span>
                 </div>
                 {useWallet && walletDeduction > 0 && (
                   <div className="flex justify-between text-sm text-green-600">
                     <span>Wallet deduction</span>
-                    <span>-{formatPrice(walletDeduction)}</span>
+                    <span className="inline-flex items-center gap-0.5">
+                      -
+                      <Price
+                        amount={walletDeduction}
+                        currency="VND"
+                        emphasis="native"
+                        hideConverted={preferred === "VND"}
+                      />
+                    </span>
                   </div>
                 )}
                 <Separator />
-                <div className="flex justify-between font-semibold text-lg">
+                <div className="flex justify-between items-start font-semibold text-lg">
                   <span>Estimated Total</span>
-                  <span>{formatPrice(estimatedTotal)}</span>
+                  <div className="flex flex-col items-end gap-1">
+                    {cartCurrencies.map((c) => (
+                      <Price
+                        key={c}
+                        amount={cartGroups[c]}
+                        currency={c}
+                        emphasis="native"
+                        className="font-semibold"
+                      />
+                    ))}
+                    {cartCurrencies.length > 1 && rateData && (
+                      <span className="text-xs text-muted-foreground font-normal">
+                        Grand total ≈{" "}
+                        {formatMoney(
+                          cartCurrencies.reduce(
+                            (sum, c) =>
+                              sum +
+                              convertMoney(cartGroups[c], c, preferred, rateData.rates),
+                            0,
+                          ),
+                          preferred,
+                        )}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
+
+              {/* Currency charge hint */}
+              {primaryCurrency && primaryCurrency !== preferred && (
+                <p className="text-xs text-muted-foreground">
+                  You will be charged in {primaryCurrency} ({getCurrencyName(primaryCurrency)})
+                </p>
+              )}
+              {cartCurrencies.length > 1 && (
+                <p className="text-xs text-muted-foreground">
+                  Items from multiple sellers — each will charge in its own currency
+                </p>
+              )}
 
               {/* Checkout Button (desktop) */}
               <Button
@@ -541,7 +673,12 @@ export default function CheckoutPage() {
                     Processing...
                   </>
                 ) : (
-                  `Pay ${formatPrice(estimatedTotal)}`
+                  `Pay ${formatPriceInline(
+                    estimatedTotal,
+                    primaryCurrency || "VND",
+                    preferred,
+                    rateData?.rates,
+                  )}`
                 )}
               </Button>
             </CardContent>
