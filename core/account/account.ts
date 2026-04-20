@@ -16,6 +16,10 @@ export enum AccountStatus {
   Suspended = 'Suspended',
 }
 
+export type ProfileSettings = {
+  preferred_currency?: string
+}
+
 export type AccountProfile = {
   id: string // UUID
   date_created: string
@@ -35,6 +39,7 @@ export type AccountProfile = {
   avatar_url: string | null
 
   description: string | null
+  settings: ProfileSettings
 }
 
 // ===== Hooks =====
