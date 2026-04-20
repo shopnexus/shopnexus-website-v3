@@ -5,8 +5,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Globe, Moon } from "lucide-react"
+import { CurrencyPicker } from "@/components/ui/currency-picker"
+import {
+  useExchangeRates,
+  usePreferredCurrency,
+  useUpdatePreferredCurrency,
+} from "@/core/common/currency"
+import { toast } from "sonner"
 
 export function PreferencesCard() {
+  const preferred = usePreferredCurrency()
+  const { data: rates } = useExchangeRates()
+  const updatePreferred = useUpdatePreferredCurrency()
+
   return (
     <Card>
       <CardHeader>
@@ -44,16 +55,28 @@ export function PreferencesCard() {
           </Button>
         </div>
         <Separator />
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4">
           <div>
             <p className="font-medium">Currency</p>
             <p className="text-sm text-muted-foreground">
-              USD ($)
+              Used to display prices across the site
             </p>
           </div>
-          <Button variant="outline" size="sm" disabled>
-            Change
-          </Button>
+          <div className="w-64">
+            {rates && (
+              <CurrencyPicker
+                value={preferred}
+                supported={rates.supported}
+                onChange={(c) =>
+                  updatePreferred.mutate(c, {
+                    onSuccess: () => toast.success(`Now showing prices in ${c}`),
+                    onError: () => toast.error("Failed to update currency"),
+                  })
+                }
+                disabled={updatePreferred.isPending}
+              />
+            )}
+          </div>
         </div>
       </CardContent>
     </Card>
