@@ -13,6 +13,7 @@ export type CartItem = {
   sku: ProductSku
   quantity: number
   resource: Resource | null
+  currency: string
 }
 
 export type Cart = CartItem[]
