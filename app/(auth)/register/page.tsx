@@ -21,26 +21,9 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Eye, EyeOff, Loader2, Mail, Lock, User, Check } from "lucide-react"
-import { useMemo, useState } from "react"
+import { useState } from "react"
 import { cn } from "@/lib/utils"
-
-// Starter list of supported signup countries (ISO 3166-1 alpha-2).
-// Keep it compact; expand later as the marketplace grows.
-const SUPPORTED_COUNTRIES = [
-  "VN", "US", "GB", "DE", "FR", "JP", "KR", "TH", "SG", "MY",
-  "ID", "PH", "AU", "CA", "IN", "CN", "TW", "HK", "IT", "ES",
-  "NL", "BR", "MX", "AE",
-] as const
-
-function useCountryOptions() {
-  return useMemo(() => {
-    const regionNames = new Intl.DisplayNames(["en"], { type: "region" })
-    return SUPPORTED_COUNTRIES.map((code) => ({
-      code,
-      label: regionNames.of(code) ?? code,
-    })).sort((a, b) => a.label.localeCompare(b.label))
-  }, [])
-}
+import { useCountryOptions } from "@/lib/countries"
 
 export default function RegisterPage() {
   const router = useRouter()

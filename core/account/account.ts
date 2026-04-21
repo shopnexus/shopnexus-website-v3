@@ -39,7 +39,13 @@ export type AccountProfile = {
   avatar_url: string | null
 
   description: string | null
+  country: string | null // ISO 3166-1 alpha-2
   settings: ProfileSettings
+}
+
+export type UpdateCountryResponse = {
+  country: string
+  inferred_currency: string
 }
 
 // ===== Hooks =====
@@ -79,6 +85,26 @@ export const useUpdateMe = () =>
       }),
     onSuccess: async () => {
       await getQueryClient().invalidateQueries({ queryKey: ['account', 'me'] })
+    },
+  })
+
+/**
+ * PATCH /account/profile/country — change the account's country.
+ * Backend returns 409 with code "wallet_not_empty" if the wallet has a
+ * non-zero balance; callers should inspect `ResponseError.code` to surface
+ * that to the user.
+ */
+export const useUpdateCountry = () =>
+  useMutation({
+    mutationFn: (country: string) =>
+      customFetchStandard<UpdateCountryResponse>('account/profile/country', {
+        method: 'PATCH',
+        body: JSON.stringify({ country }),
+      }),
+    onSuccess: async () => {
+      const qc = getQueryClient()
+      await qc.invalidateQueries({ queryKey: ['account', 'me'] })
+      await qc.invalidateQueries({ queryKey: ['common', 'exchange-rates'] })
     },
   })
 

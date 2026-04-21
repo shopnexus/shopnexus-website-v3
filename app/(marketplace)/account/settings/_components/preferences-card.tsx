@@ -7,16 +7,55 @@ import { Separator } from "@/components/ui/separator"
 import { Globe, Moon } from "lucide-react"
 import { CurrencyPicker } from "@/components/ui/currency-picker"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   useExchangeRates,
   usePreferredCurrency,
   useUpdatePreferredCurrency,
 } from "@/core/common/currency"
+import { useGetMe, useUpdateCountry } from "@/core/account/account"
+import { countryLabel, useCountryOptions } from "@/lib/countries"
+import { ResponseError } from "@/lib/queryclient/response.type"
 import { toast } from "sonner"
 
 export function PreferencesCard() {
   const preferred = usePreferredCurrency()
   const { data: rates } = useExchangeRates()
   const updatePreferred = useUpdatePreferredCurrency()
+
+  const { data: me } = useGetMe()
+  const countryOptions = useCountryOptions()
+  const updateCountry = useUpdateCountry()
+  const currentCountry = me?.country ?? ""
+
+  const handleCountryChange = (code: string) => {
+    if (!code || code === currentCountry) return
+    updateCountry.mutate(code, {
+      onSuccess: (res) => {
+        toast.success(
+          `Country updated to ${countryLabel(res.country)} (${res.country})`,
+          {
+            description: `Prices will be inferred in ${res.inferred_currency}.`,
+          },
+        )
+      },
+      onError: (err) => {
+        if (err instanceof ResponseError && err.code === "wallet_not_empty") {
+          toast.error("Cannot change country", {
+            description:
+              "Your wallet has a non-zero balance. Please spend or withdraw your balance before changing your country.",
+          })
+          return
+        }
+        toast.error("Failed to update country")
+      },
+    })
+  }
 
   return (
     <Card>
@@ -53,6 +92,35 @@ export function PreferencesCard() {
           <Button variant="outline" size="sm" disabled>
             Change
           </Button>
+        </div>
+        <Separator />
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="font-medium">Country</p>
+            <p className="text-sm text-muted-foreground">
+              {currentCountry
+                ? `${currentCountry} — ${countryLabel(currentCountry)}`
+                : "Not set"}
+            </p>
+          </div>
+          <div className="w-64">
+            <Select
+              value={currentCountry || undefined}
+              onValueChange={handleCountryChange}
+              disabled={!me || updateCountry.isPending}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select country" />
+              </SelectTrigger>
+              <SelectContent>
+                {countryOptions.map((c) => (
+                  <SelectItem key={c.code} value={c.code}>
+                    {c.label} ({c.code})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <Separator />
         <div className="flex items-center justify-between gap-4">
