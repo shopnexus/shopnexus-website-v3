@@ -51,6 +51,18 @@ export function isAddressCountryMismatch(err: unknown): boolean {
 }
 
 /**
+ * Detects the backend's `wallet_not_empty` 409 returned by
+ * `PATCH /profile/country` when the wallet has a non-zero balance.
+ *
+ * See note on {@link isAddressCountryMismatch} — `ResponseError.code` is the
+ * numeric HTTP status, so we match on the message prefix instead.
+ */
+export function isWalletNotEmpty(err: unknown): boolean {
+  if (!(err instanceof Error)) return false
+  return err.message.startsWith("wallet_not_empty")
+}
+
+/**
  * Parses the resolved and profile (or buyer) country ISO codes out of
  * an `address_country_mismatch` error message, e.g.
  *

@@ -20,7 +20,7 @@ import {
 } from "@/core/common/currency"
 import { useGetMe, useUpdateCountry } from "@/core/account/account"
 import { countryLabel, useCountryOptions } from "@/lib/countries"
-import { ResponseError } from "@/lib/queryclient/response.type"
+import { isWalletNotEmpty } from "@/lib/queryclient/response.type"
 import { toast } from "sonner"
 
 export function PreferencesCard() {
@@ -45,7 +45,7 @@ export function PreferencesCard() {
         )
       },
       onError: (err) => {
-        if (err instanceof ResponseError && err.code === "wallet_not_empty") {
+        if (isWalletNotEmpty(err)) {
           toast.error("Cannot change country", {
             description:
               "Your wallet has a non-zero balance. Please spend or withdraw your balance before changing your country.",
