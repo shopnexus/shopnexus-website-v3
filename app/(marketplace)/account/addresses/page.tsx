@@ -17,6 +17,11 @@ import { AddressesSkeleton } from "./_components/addresses-skeleton"
 import { AddressCard } from "./_components/address-card"
 import { AddressFormDialog, type ContactFormData } from "./_components/address-form-dialog"
 import { DeleteConfirmDialog } from "./_components/delete-confirm-dialog"
+import {
+  isAddressCountryMismatch,
+  parseAddressCountryMismatch,
+} from "@/lib/queryclient/response.type"
+import { countryLabel } from "@/lib/countries"
 
 const emptyForm: ContactFormData = {
   full_name: "",
@@ -39,10 +44,26 @@ export default function AddressesPage() {
   const [editingContact, setEditingContact] = useState<Contact | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<Contact | null>(null)
   const [formData, setFormData] = useState<ContactFormData>(emptyForm)
+  const [addressError, setAddressError] = useState<string | null>(null)
+
+  const handleFormDataChange = (next: ContactFormData) => {
+    // Clear the server address error as soon as the user edits the field,
+    // so they can retry without the stale message lingering.
+    if (addressError && next.address !== formData.address) {
+      setAddressError(null)
+    }
+    setFormData(next)
+  }
+
+  const handleDialogOpenChange = (open: boolean) => {
+    if (!open) setAddressError(null)
+    setIsDialogOpen(open)
+  }
 
   const openAddDialog = () => {
     setEditingContact(null)
     setFormData(emptyForm)
+    setAddressError(null)
     setIsDialogOpen(true)
   }
 
@@ -56,6 +77,7 @@ export default function AddressesPage() {
       latitude: contact.latitude ?? null,
       longitude: contact.longitude ?? null,
     })
+    setAddressError(null)
     setIsDialogOpen(true)
   }
 
@@ -89,7 +111,23 @@ export default function AddressesPage() {
         toast.success("Address added successfully")
       }
       setIsDialogOpen(false)
+      setAddressError(null)
     } catch (error) {
+      if (isAddressCountryMismatch(error)) {
+        const parsed = parseAddressCountryMismatch(error)
+        const profile = parsed?.profileCountry
+        const resolved = parsed?.resolvedCountry
+        const profileText = profile
+          ? `${countryLabel(profile)} (${profile})`
+          : "your profile country"
+        const resolvedText = resolved
+          ? ` — it appears to be in ${countryLabel(resolved)} (${resolved})`
+          : ""
+        setAddressError(
+          `This address is not in ${profileText}${resolvedText}. Enter an address in your country, or change your country in profile settings.`,
+        )
+        return
+      }
       toast.error(
         editingContact ? "Failed to update address" : "Failed to add address"
       )
@@ -172,12 +210,13 @@ export default function AddressesPage() {
 
       <AddressFormDialog
         open={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
+        onOpenChange={handleDialogOpenChange}
         isEditing={!!editingContact}
         formData={formData}
-        onFormDataChange={setFormData}
+        onFormDataChange={handleFormDataChange}
         onSubmit={handleSubmit}
         isSubmitting={isSubmitting}
+        addressError={addressError}
       />
 
       <DeleteConfirmDialog

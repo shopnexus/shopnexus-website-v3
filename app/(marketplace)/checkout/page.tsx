@@ -18,7 +18,11 @@ import {
   convertMoney,
 } from "@/lib/money"
 import { useExchangeRates, usePreferredCurrency } from "@/core/common/currency"
-import { walletCurrencyForCountry } from "@/lib/countries"
+import { walletCurrencyForCountry, countryLabel } from "@/lib/countries"
+import {
+  isAddressCountryMismatch,
+  parseAddressCountryMismatch,
+} from "@/lib/queryclient/response.type"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -68,6 +72,10 @@ export default function CheckoutPage() {
   const [selectedPaymentOption, setSelectedPaymentOption] = useState<string>("")
   const [useWallet, setUseWallet] = useState(false)
   const [transportSelections, setTransportSelections] = useState<Record<string, string>>({})
+  const [addressMismatch, setAddressMismatch] = useState<{
+    resolvedCountry: string | null
+    profileCountry: string | null
+  } | null>(null)
 
   // Set default contact when data loads
   useEffect(() => {
@@ -121,6 +129,7 @@ export default function CheckoutPage() {
     if (!selectedContact || !cart) return
 
     try {
+      setAddressMismatch(null)
       const result = await checkoutMutation.mutateAsync({
         buy_now: false,
         address: selectedContact.address,
@@ -142,10 +151,24 @@ export default function CheckoutPage() {
         router.push("/account/orders")
       }
     } catch (error) {
+      if (isAddressCountryMismatch(error)) {
+        setAddressMismatch(
+          parseAddressCountryMismatch(error) ?? {
+            resolvedCountry: null,
+            profileCountry: null,
+          },
+        )
+        return
+      }
       toast.error("Failed to checkout. Please try again.")
       console.error(error)
     }
   }
+
+  // Reset the mismatch error whenever the user picks a different address.
+  useEffect(() => {
+    setAddressMismatch(null)
+  }, [selectedContactId])
 
   const isLoading = cartLoading || contactsLoading
   const itemCount = cart?.reduce((acc, item) => acc + item.quantity, 0) ?? 0
@@ -234,7 +257,11 @@ export default function CheckoutPage() {
     )
   }
 
-  const canCheckout = !!selectedContactId && !!selectedPaymentOption && cart.length > 0
+  const canCheckout =
+    !!selectedContactId &&
+    !!selectedPaymentOption &&
+    cart.length > 0 &&
+    !addressMismatch
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -322,6 +349,9 @@ export default function CheckoutPage() {
                     )
                   })}
                 </RadioGroup>
+              )}
+              {addressMismatch && (
+                <AddressMismatchBlock mismatch={addressMismatch} />
               )}
             </CardContent>
           </Card>
@@ -677,6 +707,50 @@ export default function CheckoutPage() {
             </CardContent>
           </Card>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function AddressMismatchBlock({
+  mismatch,
+}: {
+  mismatch: { resolvedCountry: string | null; profileCountry: string | null }
+}) {
+  const { resolvedCountry, profileCountry } = mismatch
+  const profileText = profileCountry
+    ? `${countryLabel(profileCountry)} (${profileCountry})`
+    : "your country"
+  const resolvedText = resolvedCountry
+    ? `${countryLabel(resolvedCountry)} (${resolvedCountry})`
+    : "a different country"
+
+  return (
+    <div
+      role="alert"
+      className="mt-4 rounded-lg border border-destructive/50 bg-destructive/5 p-4 text-sm text-destructive"
+    >
+      <p className="font-medium">
+        Shipping address doesn&apos;t match your country
+      </p>
+      <p className="mt-1 text-destructive/90">
+        Your profile country is {profileText}, but this shipping address
+        resolves to {resolvedText}. Pick an address in your country, or update
+        your country in settings to continue.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-3">
+        <Link
+          href="/account/addresses"
+          className="inline-flex items-center gap-1 text-sm font-medium underline underline-offset-4"
+        >
+          Manage addresses
+        </Link>
+        <Link
+          href="/account/settings"
+          className="inline-flex items-center gap-1 text-sm font-medium underline underline-offset-4"
+        >
+          Change country in settings
+        </Link>
       </div>
     </div>
   )

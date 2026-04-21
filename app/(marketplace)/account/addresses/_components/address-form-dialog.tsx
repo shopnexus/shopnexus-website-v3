@@ -48,6 +48,12 @@ interface AddressFormDialogProps {
   onFormDataChange: (data: ContactFormData) => void
   onSubmit: () => void
   isSubmitting: boolean
+  /**
+   * Server-side validation error attached to the address field (e.g.
+   * `address_country_mismatch`). Cleared by the parent when the user edits
+   * the address or closes the dialog.
+   */
+  addressError?: string | null
 }
 
 export function AddressFormDialog({
@@ -58,6 +64,7 @@ export function AddressFormDialog({
   onFormDataChange,
   onSubmit,
   isSubmitting,
+  addressError,
 }: AddressFormDialogProps) {
   const {
     getLocation,
@@ -162,13 +169,28 @@ export function AddressFormDialog({
               <Input
                 id="address"
                 placeholder="Enter full address"
-                className="pl-10"
+                className={
+                  addressError
+                    ? "pl-10 border-destructive focus-visible:ring-destructive"
+                    : "pl-10"
+                }
                 value={formData.address}
                 onChange={(e) =>
                   onFormDataChange({ ...formData, address: e.target.value })
                 }
+                aria-invalid={addressError ? true : undefined}
+                aria-describedby={addressError ? "address-error" : undefined}
               />
             </div>
+            {addressError && (
+              <p
+                id="address-error"
+                className="text-sm text-destructive"
+                role="alert"
+              >
+                {addressError}
+              </p>
+            )}
             {formData.latitude != null && formData.longitude != null && (
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground flex items-center gap-1">

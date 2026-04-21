@@ -21,7 +21,11 @@ import { formatSoldCount } from "@/lib/utils"
 import { formatMoney, formatPriceInline, convertMoney } from "@/lib/money"
 import { Price } from "@/components/ui/price"
 import { useExchangeRates, usePreferredCurrency } from "@/core/common/currency"
-import { walletCurrencyForCountry } from "@/lib/countries"
+import { walletCurrencyForCountry, countryLabel } from "@/lib/countries"
+import {
+  isAddressCountryMismatch,
+  parseAddressCountryMismatch,
+} from "@/lib/queryclient/response.type"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
@@ -121,6 +125,10 @@ export default function ProductDetailPage({
 	const [buyNowTransportOption, setBuyNowTransportOption] = useState<string>("")
 	const [buyNowPaymentOption, setBuyNowPaymentOption] = useState<string>("")
 	const [buyNowUseWallet, setBuyNowUseWallet] = useState(false)
+	const [buyNowAddressMismatch, setBuyNowAddressMismatch] = useState<{
+		resolvedCountry: string | null
+		profileCountry: string | null
+	} | null>(null)
 
 	// Extract all unique attribute names and their possible values
 	const attributeOptions = useMemo(() => {
@@ -313,6 +321,13 @@ export default function ProductDetailPage({
 	)
 	const walletBalance = walletData?.balance ?? 0
 
+	// Clear the mismatch banner whenever the user swaps to a different
+	// shipping contact in the dialog — they may well have picked one in a
+	// matching country, so the stale error shouldn't block them.
+	useEffect(() => {
+		setBuyNowAddressMismatch(null)
+	}, [buyNowContactId])
+
 	// Seed Buy Now selections when source data loads
 	useEffect(() => {
 		if (!buyNowContactId && contacts && contacts.length > 0) {
@@ -368,6 +383,7 @@ export default function ProductDetailPage({
 			return
 		}
 		setIsBuyNowProcessing(true)
+		setBuyNowAddressMismatch(null)
 		try {
 			const result = await checkout.mutateAsync({
 				buy_now: true,
@@ -398,6 +414,15 @@ export default function ProductDetailPage({
 			})
 			router.push("/account/orders")
 		} catch (err: any) {
+			if (isAddressCountryMismatch(err)) {
+				setBuyNowAddressMismatch(
+					parseAddressCountryMismatch(err) ?? {
+						resolvedCountry: null,
+						profileCountry: null,
+					},
+				)
+				return
+			}
 			toast.error(err?.message || "Failed to place order")
 		} finally {
 			setIsBuyNowProcessing(false)
@@ -1121,7 +1146,9 @@ export default function ProductDetailPage({
 			<Dialog
 				open={isBuyNowOpen}
 				onOpenChange={(open) => {
-					if (!isBuyNowProcessing) setIsBuyNowOpen(open)
+					if (isBuyNowProcessing) return
+					setIsBuyNowOpen(open)
+					if (!open) setBuyNowAddressMismatch(null)
 				}}
 			>
 				<DialogContent className="sm:max-w-xl">
@@ -1195,6 +1222,35 @@ export default function ProductDetailPage({
 									>
 										Add a shipping address →
 									</Link>
+								)}
+								{buyNowAddressMismatch && (
+									<div
+										role="alert"
+										className="rounded-md border border-destructive/50 bg-destructive/5 p-3 text-xs text-destructive mt-2"
+									>
+										<p className="font-medium">
+											Address doesn&apos;t match your country
+										</p>
+										<p className="mt-1 text-destructive/90">
+											Your profile country is{" "}
+											{buyNowAddressMismatch.profileCountry
+												? `${countryLabel(buyNowAddressMismatch.profileCountry)} (${buyNowAddressMismatch.profileCountry})`
+												: "not your address's country"}
+											,
+											but this address resolves to{" "}
+											{buyNowAddressMismatch.resolvedCountry
+												? `${countryLabel(buyNowAddressMismatch.resolvedCountry)} (${buyNowAddressMismatch.resolvedCountry})`
+												: "a different country"}
+											. Pick another address, or{" "}
+											<Link
+												href="/account/settings"
+												className="underline underline-offset-2"
+											>
+												change your country in settings
+											</Link>
+											.
+										</p>
+									</div>
 								)}
 							</div>
 
@@ -1369,7 +1425,8 @@ export default function ProductDetailPage({
 								isBuyNowProcessing ||
 								!selectedBuyNowContact ||
 								!buyNowTransportOption ||
-								!buyNowPaymentOption
+								!buyNowPaymentOption ||
+								!!buyNowAddressMismatch
 							}
 						>
 							{isBuyNowProcessing ? (
