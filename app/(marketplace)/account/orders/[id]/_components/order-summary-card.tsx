@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import { useExchangeRates, usePreferredCurrency } from "@/core/common/currency"
+import { useExchangeRates, useCurrency } from "@/core/common/currency"
 import { formatPriceInline } from "@/lib/money"
 
 interface OrderSummaryCardProps {
@@ -20,7 +20,7 @@ export function OrderSummaryCard({
   total,
   currency,
 }: OrderSummaryCardProps) {
-  const preferred = usePreferredCurrency()
+  const preferred = useCurrency()
   const { data: rateData } = useExchangeRates()
   const fmt = (amount: number) =>
     formatPriceInline(amount, currency, preferred, rateData?.rates, "native")

@@ -5,7 +5,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Globe, Moon } from "lucide-react"
-import { CurrencyPicker } from "@/components/ui/currency-picker"
 import {
   Select,
   SelectContent,
@@ -13,21 +12,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  useExchangeRates,
-  usePreferredCurrency,
-  useUpdatePreferredCurrency,
-} from "@/core/common/currency"
 import { useGetMe, useUpdateCountry } from "@/core/account/account"
 import { countryLabel, useCountryOptions } from "@/lib/countries"
 import { isWalletNotEmpty } from "@/lib/queryclient/response.type"
 import { toast } from "sonner"
 
 export function PreferencesCard() {
-  const preferred = usePreferredCurrency()
-  const { data: rates } = useExchangeRates()
-  const updatePreferred = useUpdatePreferredCurrency()
-
   const { data: me } = useGetMe()
   const countryOptions = useCountryOptions()
   const updateCountry = useUpdateCountry()
@@ -40,7 +30,7 @@ export function PreferencesCard() {
         toast.success(
           `Country updated to ${countryLabel(res.country)} (${res.country})`,
           {
-            description: `Prices will be inferred in ${res.inferred_currency}.`,
+            description: `Prices will be shown in ${res.inferred_currency}.`,
           },
         )
       },
@@ -101,6 +91,7 @@ export function PreferencesCard() {
               {currentCountry
                 ? `${currentCountry} — ${countryLabel(currentCountry)}`
                 : "Not set"}
+              {me?.currency && ` · Currency: ${me.currency}`}
             </p>
           </div>
           <div className="w-64">
@@ -120,30 +111,6 @@ export function PreferencesCard() {
                 ))}
               </SelectContent>
             </Select>
-          </div>
-        </div>
-        <Separator />
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="font-medium">Currency</p>
-            <p className="text-sm text-muted-foreground">
-              Used to display prices across the site
-            </p>
-          </div>
-          <div className="w-64">
-            {rates && (
-              <CurrencyPicker
-                value={preferred}
-                supported={rates.supported}
-                onChange={(c) =>
-                  updatePreferred.mutate(c, {
-                    onSuccess: () => toast.success(`Now showing prices in ${c}`),
-                    onError: () => toast.error("Failed to update currency"),
-                  })
-                }
-                disabled={updatePreferred.isPending}
-              />
-            )}
           </div>
         </div>
       </CardContent>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useExchangeRates, usePreferredCurrency } from "@/core/common/currency"
+import { useExchangeRates, useCurrency } from "@/core/common/currency"
 import { convertMoney, formatMoney } from "@/lib/money"
 import { cn } from "@/lib/utils"
 
@@ -28,7 +28,7 @@ export function Price({
   showRateHint = false,
   className,
 }: PriceProps) {
-  const preferred = usePreferredCurrency()
+  const preferred = useCurrency()
   const { data: rateData } = useExchangeRates()
 
   const sameCurrency = currency === preferred

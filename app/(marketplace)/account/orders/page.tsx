@@ -32,14 +32,14 @@ import {
   Inbox,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useExchangeRates, usePreferredCurrency } from "@/core/common/currency"
+import { useExchangeRates, useCurrency } from "@/core/common/currency"
 import { formatPriceInline } from "@/lib/money"
 import { toast } from "sonner"
 
 // ===== Pending Items Section =====
 
 function PendingItemCard({ item, onCancel }: { item: TOrderItem; onCancel: (id: number) => void }) {
-  const preferred = usePreferredCurrency()
+  const preferred = useCurrency()
   const { data: rateData } = useExchangeRates()
   const fmt = (amount: number) =>
     formatPriceInline(amount, "VND", preferred, rateData?.rates, "native")

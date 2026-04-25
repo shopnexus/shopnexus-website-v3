@@ -6,7 +6,7 @@ import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Minus, Plus, Trash2, ShoppingBag } from "lucide-react"
 import { useGetCart, useUpdateCart, useClearCart } from "@/core/order/cart"
-import { useExchangeRates, usePreferredCurrency } from "@/core/common/currency"
+import { useExchangeRates, useCurrency } from "@/core/common/currency"
 import { convertMoney, formatMoney, formatPriceInline } from "@/lib/money"
 import Image from "next/image"
 import Link from "next/link"
@@ -21,7 +21,7 @@ export function CartSheet({ onClose }: CartSheetProps) {
 	const { data: cart, isLoading } = useGetCart()
 	const updateCart = useUpdateCart()
 	const clearCart = useClearCart()
-	const preferred = usePreferredCurrency()
+	const preferred = useCurrency()
 	const { data: rateData } = useExchangeRates()
 
 	const items = cart ?? []

@@ -1,5 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query"
-import { getQueryClient } from "@/lib/queryclient/query-client"
+import { useQuery } from "@tanstack/react-query"
 import { customFetchStandard } from "@/lib/queryclient/custom-fetch"
 import { useGetMe } from "@/core/account/account"
 
@@ -11,6 +10,7 @@ export type ExchangeRateSnapshot = {
 }
 
 const RATES_QUERY_KEY = ["common", "exchange-rates"] as const
+const DEFAULT_CURRENCY = "VND"
 
 export const useExchangeRates = () =>
   useQuery({
@@ -22,38 +22,11 @@ export const useExchangeRates = () =>
     refetchOnWindowFocus: false,
   })
 
-const LS_KEY = "preferred_currency"
-const DEFAULT_CURRENCY = "VND"
-
 /**
- * Returns the active preferred currency. Fallback chain:
- *   profile.settings.preferred_currency > localStorage > "VND"
+ * Returns the active currency for the signed-in user, derived server-side
+ * from `profile.country`. Falls back to VND for guests or before /me loads.
  */
-export function usePreferredCurrency(): string {
+export function useCurrency(): string {
   const { data: me } = useGetMe()
-  const fromProfile = me?.settings?.preferred_currency
-  if (fromProfile) return fromProfile
-
-  if (typeof window !== "undefined") {
-    const fromLocal = window.localStorage.getItem(LS_KEY)
-    if (fromLocal) return fromLocal
-  }
-  return DEFAULT_CURRENCY
-}
-
-export const useUpdatePreferredCurrency = () => {
-  const queryClient = getQueryClient()
-  return useMutation({
-    mutationFn: (currency: string) =>
-      customFetchStandard("account/me/settings", {
-        method: "PATCH",
-        body: JSON.stringify({ preferred_currency: currency }),
-      }),
-    onSuccess: (_, currency) => {
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(LS_KEY, currency)
-      }
-      queryClient.invalidateQueries({ queryKey: ["account", "me"] })
-    },
-  })
+  return me?.currency ?? DEFAULT_CURRENCY
 }

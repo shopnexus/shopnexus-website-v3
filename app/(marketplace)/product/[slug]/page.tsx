@@ -20,11 +20,11 @@ import { useGetWalletBalance } from "@/core/account/wallet"
 import { formatSoldCount } from "@/lib/utils"
 import { formatMoney, formatPriceInline, convertMoney } from "@/lib/money"
 import { Price } from "@/components/ui/price"
-import { useExchangeRates, usePreferredCurrency } from "@/core/common/currency"
+import { useExchangeRates, useCurrency } from "@/core/common/currency"
 import { walletCurrencyForCountry, countryLabel } from "@/lib/countries"
 import {
-  isAddressCountryMismatch,
-  parseAddressCountryMismatch,
+	isAddressCountryMismatch,
+	parseAddressCountryMismatch,
 } from "@/lib/queryclient/response.type"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -108,7 +108,7 @@ export default function ProductDetailPage({
 	const { data: paymentOptions } = useListServiceOption({ category: "payment" })
 	const { data: paymentMethods } = useListPaymentMethods()
 	const { data: walletData } = useGetWalletBalance()
-	const preferred = usePreferredCurrency()
+	const preferred = useCurrency()
 	const { data: rateData } = useExchangeRates()
 
 	const [selectedAttributes, setSelectedAttributes] =
@@ -1202,10 +1202,10 @@ export default function ProductDetailPage({
 										onValueChange={setBuyNowContactId}
 										disabled={contacts.length === 1}
 									>
-										<SelectTrigger className="h-9 text-sm">
+										<SelectTrigger className="h-9 text-sm w-131!">
 											<SelectValue placeholder="Select address" />
 										</SelectTrigger>
-										<SelectContent>
+										<SelectContent className="">
 											{contacts.map((c) => (
 												<SelectItem key={c.id} value={c.id}>
 													<span className="truncate">
@@ -1236,8 +1236,7 @@ export default function ProductDetailPage({
 											{buyNowAddressMismatch.profileCountry
 												? `${countryLabel(buyNowAddressMismatch.profileCountry)} (${buyNowAddressMismatch.profileCountry})`
 												: "not your address's country"}
-											,
-											but this address resolves to{" "}
+											, but this address resolves to{" "}
 											{buyNowAddressMismatch.resolvedCountry
 												? `${countryLabel(buyNowAddressMismatch.resolvedCountry)} (${buyNowAddressMismatch.resolvedCountry})`
 												: "a different country"}
@@ -1318,7 +1317,7 @@ export default function ProductDetailPage({
 											Use wallet
 										</Label>
 										<span className="text-xs text-muted-foreground">
-											({formatMoney(walletBalance, product?.currency ?? "VND")} available)
+											({formatMoney(walletBalance, preferred)} available)
 										</span>
 									</div>
 									<Switch
@@ -1390,9 +1389,7 @@ export default function ProductDetailPage({
 											? 1
 											: rateData.rates[sellerCurrency]
 									const rateTo =
-										buyerCurrency === "USD"
-											? 1
-											: rateData.rates[buyerCurrency]
+										buyerCurrency === "USD" ? 1 : rateData.rates[buyerCurrency]
 									if (!rateFrom || !rateTo) return null
 									const rate = rateTo / rateFrom
 									return (

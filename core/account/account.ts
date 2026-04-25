@@ -16,10 +16,6 @@ export enum AccountStatus {
   Suspended = 'Suspended',
 }
 
-export type ProfileSettings = {
-  preferred_currency?: string
-}
-
 export type AccountProfile = {
   id: string // UUID
   date_created: string
@@ -39,8 +35,8 @@ export type AccountProfile = {
   avatar_url: string | null
 
   description: string | null
-  country: string | null // ISO 3166-1 alpha-2
-  settings: ProfileSettings
+  country: string // ISO 3166-1 alpha-2
+  currency: string // ISO 4217, inferred from country on the server
 }
 
 export type UpdateCountryResponse = {

@@ -3,7 +3,7 @@
 import Image from "next/image"
 import { ProductLink } from "@/components/product/product-link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { useExchangeRates, usePreferredCurrency } from "@/core/common/currency"
+import { useExchangeRates, useCurrency } from "@/core/common/currency"
 import { formatPriceInline } from "@/lib/money"
 import { Package } from "lucide-react"
 
@@ -22,7 +22,7 @@ interface OrderItemsCardProps {
 }
 
 export function OrderItemsCard({ items, currency }: OrderItemsCardProps) {
-	const preferred = usePreferredCurrency()
+	const preferred = useCurrency()
 	const { data: rateData } = useExchangeRates()
 	return (
 		<Card>

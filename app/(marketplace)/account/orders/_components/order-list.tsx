@@ -4,7 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { TOrder } from "@/core/order/order.buyer"
-import { useExchangeRates, usePreferredCurrency } from "@/core/common/currency"
+import { useExchangeRates, useCurrency } from "@/core/common/currency"
 import { formatPriceInline } from "@/lib/money"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -47,7 +47,7 @@ export function OrderList({
   onLoadMore?: () => void
 }) {
   const [reviewingOrder, setReviewingOrder] = useState<{ orderId: string; spuId: string } | null>(null)
-  const preferred = usePreferredCurrency()
+  const preferred = useCurrency()
   const { data: rateData } = useExchangeRates()
   const fmtInOrder = (order: TOrder, amount: number) =>
     formatPriceInline(
