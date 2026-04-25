@@ -60,7 +60,7 @@ export default function SellerProductsPage() {
 			my_products: true,
 			...(debouncedSearch ? { search: debouncedSearch } : {}),
 			...(statusFilter !== "all"
-				? { is_active: [statusFilter === "active"] }
+				? { is_enabled: [statusFilter === "active"] }
 				: {}),
 		})
 	const deleteMutation = useDeleteProductSPU()
@@ -231,9 +231,9 @@ export default function SellerProductsPage() {
 												</span>
 											</div>
 											<Badge
-												variant={product.is_active ? "default" : "secondary"}
+												variant={product.is_enabled ? "default" : "secondary"}
 											>
-												{product.is_active ? "Active" : "Inactive"}
+												{product.is_enabled ? "Active" : "Inactive"}
 											</Badge>
 											{product.is_stale_embedding && (
 												<Badge variant="outline" className="text-xs border-amber-300 text-amber-600 bg-amber-50 dark:bg-amber-950/30">

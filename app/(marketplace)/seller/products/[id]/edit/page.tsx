@@ -97,7 +97,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         name: product.name,
         description: product.description,
         category_id: product.category?.id || "",
-        is_active: product.is_active,
+        is_enabled: product.is_enabled,
         tags: product.tags || [],
         resource_ids: product.resources?.map(r => r.id) || [],
         specifications: product.specifications || [],

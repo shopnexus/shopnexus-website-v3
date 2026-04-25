@@ -21,7 +21,7 @@ export type ProductSPUFormData = {
   name: string
   description: string
   category_id: string
-  is_active: boolean
+  is_enabled: boolean
   tags: string[]
   resource_ids: string[]
   specifications: Array<{ name: string; value: string }>
@@ -31,7 +31,7 @@ export const defaultFormData: ProductSPUFormData = {
   name: "",
   description: "",
   category_id: "",
-  is_active: true,
+  is_enabled: true,
   tags: [],
   resource_ids: [],
   specifications: [],
@@ -101,8 +101,8 @@ export function ProductSPUForm({ data, onChange, images, onImagesChange, afterNa
               <p className="text-sm text-muted-foreground">Make this product visible to customers</p>
             </div>
             <Switch
-              checked={data.is_active}
-              onCheckedChange={(checked) => onChange("is_active", checked)}
+              checked={data.is_enabled}
+              onCheckedChange={(checked) => onChange("is_enabled", checked)}
             />
           </div>
         </CardContent>

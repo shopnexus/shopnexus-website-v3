@@ -29,7 +29,7 @@ export default function NewProductPage() {
         name: formData.name,
         description: formData.description,
         category_id: formData.category_id,
-        is_active: formData.is_active,
+        is_enabled: formData.is_enabled,
         tags: formData.tags,
         resource_ids: formData.resource_ids,
         specifications: formData.specifications.filter((s) => s.name && s.value),
