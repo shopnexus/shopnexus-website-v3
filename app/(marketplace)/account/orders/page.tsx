@@ -1,248 +1,158 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo } from "react"
 import Link from "next/link"
 import {
   useListBuyerPendingItems,
-  useListBuyerConfirmed,
-  useCancelBuyerPending,
-  TOrderItem,
-  TOrder,
+  useListBuyerPendingOrders,
+  useListBuyerCompletedOrders,
+  useListBuyerCancelledItems,
+  useListBuyerCancelledOrders,
 } from "@/core/order/order.buyer"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import { OrderList } from "./_components/order-list"
-import {
-  Package,
-  Clock,
-  Loader2,
-  Inbox,
-} from "lucide-react"
-import { cn } from "@/lib/utils"
-import { isCancelledOrder, isCompletedOrder, isActiveOrder } from "@/lib/order-status"
-import { useExchangeRates, useCurrency } from "@/core/common/currency"
-import { formatPriceInline } from "@/lib/money"
-import { toast } from "sonner"
+import { ItemList } from "./_components/item-list"
+import { Inbox } from "lucide-react"
 
-// ===== Pending Items Section =====
+const PAGE_SIZE = 20
 
-function PendingItemCard({ item, onCancel }: { item: TOrderItem; onCancel: (id: number) => void }) {
-  const preferred = useCurrency()
-  const { data: rateData } = useExchangeRates()
-  const fmt = (amount: number) =>
-    formatPriceInline(amount, "VND", preferred, rateData?.rates, "native")
-  const badgeLabel = "Awaiting Seller"
-  const badgeColor = "bg-yellow-100 text-yellow-800"
-
+function LoadingSkeleton() {
   return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="flex items-center gap-3">
-          <div className="relative h-16 w-16 rounded bg-muted flex items-center justify-center flex-shrink-0">
-            <Package className="h-6 w-6 text-muted-foreground" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-medium truncate">{item.SkuName}</p>
-            <p className="text-sm text-muted-foreground inline-flex items-center gap-1">
-              Qty: {item.Quantity} &middot; {fmt(item.SubtotalAmount)} total
-            </p>
-            {item.Note && (
-              <p className="text-sm text-muted-foreground truncate">{item.Note}</p>
-            )}
-          </div>
-          <div className="flex flex-col items-end gap-2 flex-shrink-0">
-            <Badge variant="secondary" className={cn("font-normal gap-1", badgeColor)}>
-              <Clock className="h-3 w-3" />
-              {badgeLabel}
-            </Badge>
-            <span className="text-sm font-medium">
-              {fmt(item.PaidAmount)}
-            </span>
-            {!item.OrderID && !item.DateCancelled && (
-              <Button variant="ghost" size="sm" className="text-destructive h-7 px-2" onClick={() => onCancel(item.ID)}>
-                Cancel
-              </Button>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-function PendingTab() {
-  const {
-    data: pendingData,
-    isLoading: pendingLoading,
-    fetchNextPage: fetchMorePending,
-    hasNextPage: hasMorePending,
-    isFetchingNextPage: fetchingMorePending,
-  } = useListBuyerPendingItems({ limit: 20 })
-
-  const {
-    data: ordersData,
-    isLoading: ordersLoading,
-    fetchNextPage: fetchMoreOrders,
-    hasNextPage: hasMoreOrders,
-    isFetchingNextPage: fetchingMoreOrders,
-  } = useListBuyerConfirmed({ limit: 20 })
-
-  const cancelMutation = useCancelBuyerPending()
-  const [cancelId, setCancelId] = useState<number | null>(null)
-
-  const pendingItems = useMemo(
-    () => pendingData?.pages.flatMap((p) => p.data) ?? [],
-    [pendingData],
-  )
-  const activeOrders = useMemo(
-    () => (ordersData?.pages.flatMap((p) => p.data) ?? []).filter(isActiveOrder),
-    [ordersData],
-  )
-
-  const handleCancel = async () => {
-    if (cancelId === null) return
-    try {
-      await cancelMutation.mutateAsync(cancelId)
-      toast.success("Item cancelled.")
-      setCancelId(null)
-    } catch {
-      toast.error("Failed to cancel item.")
-    }
-  }
-
-  const isLoading = pendingLoading || ordersLoading
-
-  if (isLoading) {
-    return (
-      <div className="space-y-4">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Card key={i}>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <Skeleton className="h-16 w-16 rounded" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-4 w-48" />
-                  <Skeleton className="h-3 w-24" />
-                </div>
-                <Skeleton className="h-6 w-24" />
+    <div className="space-y-4">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <Card key={i}>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-16 w-16 rounded" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-48" />
+                <Skeleton className="h-3 w-24" />
               </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    )
-  }
-
-  if (pendingItems.length === 0 && activeOrders.length === 0) {
-    return (
-      <div className="text-center py-12">
-        <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-4">
-          <Inbox className="h-8 w-8 text-muted-foreground" />
-        </div>
-        <h3 className="text-lg font-semibold mb-2">No pending orders</h3>
-        <p className="text-muted-foreground mb-4">
-          Items awaiting approval and active orders will appear here.
-        </p>
-        <Button asChild>
-          <Link href="/">Start Shopping</Link>
-        </Button>
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* Pending Items (awaiting seller approval) */}
-      {pendingItems.length > 0 && (
-        <div className="space-y-3">
-          <h3 className="text-sm font-medium text-muted-foreground">Awaiting Seller Approval</h3>
-          <div className="space-y-3">
-            {pendingItems.map((item) => (
-              <PendingItemCard key={item.ID} item={item} onCancel={setCancelId} />
-            ))}
-          </div>
-          {hasMorePending && (
-            <div className="text-center">
-              <Button variant="outline" size="sm" onClick={() => fetchMorePending()} disabled={fetchingMorePending}>
-                {fetchingMorePending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Loading...</> : "Load More"}
-              </Button>
+              <Skeleton className="h-6 w-24" />
             </div>
-          )}
-        </div>
-      )}
-
-      {/* Active Orders (unpaid / confirmed / shipped) */}
-      {activeOrders.length > 0 && (
-        <div className="space-y-3">
-          {pendingItems.length > 0 && (
-            <h3 className="text-sm font-medium text-muted-foreground">Active Orders</h3>
-          )}
-          <OrderList
-            orders={activeOrders}
-            hasNextPage={hasMoreOrders}
-            isFetchingNextPage={fetchingMoreOrders}
-            onLoadMore={() => fetchMoreOrders()}
-          />
-        </div>
-      )}
-
-      {/* Cancel Confirmation Dialog */}
-      <Dialog open={cancelId !== null} onOpenChange={(open) => { if (!open) setCancelId(null) }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Cancel Item</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to cancel this item? This cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCancelId(null)}>Keep Item</Button>
-            <Button variant="destructive" onClick={handleCancel} disabled={cancelMutation.isPending}>
-              {cancelMutation.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Cancelling...</> : "Cancel Item"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </CardContent>
+        </Card>
+      ))}
     </div>
   )
 }
 
-// ===== Main Page =====
+function EmptyState({ message, cta }: { message: string; cta?: boolean }) {
+  return (
+    <div className="text-center py-12">
+      <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-4">
+        <Inbox className="h-8 w-8 text-muted-foreground" />
+      </div>
+      <h3 className="text-lg font-semibold mb-2">{message}</h3>
+      {cta && (
+        <Button asChild className="mt-4">
+          <Link href="/">Start Shopping</Link>
+        </Button>
+      )}
+    </div>
+  )
+}
 
+function PendingTab() {
+  const itemsQ = useListBuyerPendingItems({ limit: PAGE_SIZE })
+  const ordersQ = useListBuyerPendingOrders({ limit: PAGE_SIZE })
+
+  const items = useMemo(() => itemsQ.data?.pages.flatMap((p) => p.data) ?? [], [itemsQ.data])
+  const orders = useMemo(() => ordersQ.data?.pages.flatMap((p) => p.data) ?? [], [ordersQ.data])
+
+  if (itemsQ.isLoading || ordersQ.isLoading) return <LoadingSkeleton />
+  if (items.length === 0 && orders.length === 0) {
+    return <EmptyState message="No pending orders" cta />
+  }
+
+  return (
+    <div className="space-y-6">
+      {items.length > 0 && (
+        <section className="space-y-3">
+          <h3 className="text-sm font-medium text-muted-foreground">Awaiting Payment / Seller Confirm</h3>
+          <ItemList
+            items={items}
+            cancellable
+            hasNextPage={itemsQ.hasNextPage}
+            isFetchingNextPage={itemsQ.isFetchingNextPage}
+            onLoadMore={() => itemsQ.fetchNextPage()}
+          />
+        </section>
+      )}
+      {orders.length > 0 && (
+        <section className="space-y-3">
+          <h3 className="text-sm font-medium text-muted-foreground">Awaiting Delivery & Payout</h3>
+          <OrderList
+            orders={orders}
+            hasNextPage={ordersQ.hasNextPage}
+            isFetchingNextPage={ordersQ.isFetchingNextPage}
+            onLoadMore={() => ordersQ.fetchNextPage()}
+          />
+        </section>
+      )}
+    </div>
+  )
+}
+
+function CompletedTab() {
+  const ordersQ = useListBuyerCompletedOrders({ limit: PAGE_SIZE })
+  const orders = useMemo(() => ordersQ.data?.pages.flatMap((p) => p.data) ?? [], [ordersQ.data])
+
+  if (ordersQ.isLoading) return <LoadingSkeleton />
+  if (orders.length === 0) return <EmptyState message="No completed orders" />
+
+  return (
+    <OrderList
+      orders={orders}
+      hasNextPage={ordersQ.hasNextPage}
+      isFetchingNextPage={ordersQ.isFetchingNextPage}
+      onLoadMore={() => ordersQ.fetchNextPage()}
+    />
+  )
+}
+
+function CancelledTab() {
+  const itemsQ = useListBuyerCancelledItems({ limit: PAGE_SIZE })
+  const ordersQ = useListBuyerCancelledOrders({ limit: PAGE_SIZE })
+
+  const items = useMemo(() => itemsQ.data?.pages.flatMap((p) => p.data) ?? [], [itemsQ.data])
+  const orders = useMemo(() => ordersQ.data?.pages.flatMap((p) => p.data) ?? [], [ordersQ.data])
+
+  if (itemsQ.isLoading || ordersQ.isLoading) return <LoadingSkeleton />
+  if (items.length === 0 && orders.length === 0) return <EmptyState message="No cancelled orders" />
+
+  return (
+    <div className="space-y-6">
+      {items.length > 0 && (
+        <section className="space-y-3">
+          <h3 className="text-sm font-medium text-muted-foreground">Cancelled Items (pre-confirm)</h3>
+          <ItemList
+            items={items}
+            hasNextPage={itemsQ.hasNextPage}
+            isFetchingNextPage={itemsQ.isFetchingNextPage}
+            onLoadMore={() => itemsQ.fetchNextPage()}
+          />
+        </section>
+      )}
+      {orders.length > 0 && (
+        <section className="space-y-3">
+          <h3 className="text-sm font-medium text-muted-foreground">Cancelled Orders</h3>
+          <OrderList
+            orders={orders}
+            hasNextPage={ordersQ.hasNextPage}
+            isFetchingNextPage={ordersQ.isFetchingNextPage}
+            onLoadMore={() => ordersQ.fetchNextPage()}
+          />
+        </section>
+      )}
+    </div>
+  )
+}
 
 export default function OrdersPage() {
-  const {
-    data: allOrdersData,
-    isLoading: ordersLoading,
-    fetchNextPage: fetchMoreOrders,
-    hasNextPage: hasMoreOrders,
-    isFetchingNextPage: fetchingMoreOrders,
-  } = useListBuyerConfirmed({ limit: 50 })
-
-  const allOrders = useMemo(
-    () => allOrdersData?.pages.flatMap((p) => p.data) ?? [],
-    [allOrdersData],
-  )
-  const completedOrders = useMemo(
-    () => allOrders.filter(isCompletedOrder),
-    [allOrders],
-  )
-  const cancelledOrders = useMemo(
-    () => allOrders.filter(isCancelledOrder),
-    [allOrders],
-  )
-
   return (
     <div className="space-y-6">
       <div>
@@ -262,23 +172,11 @@ export default function OrdersPage() {
         </TabsContent>
 
         <TabsContent value="completed" className="mt-6">
-          <OrderList
-            orders={completedOrders}
-            isLoading={ordersLoading}
-            hasNextPage={hasMoreOrders}
-            isFetchingNextPage={fetchingMoreOrders}
-            onLoadMore={() => fetchMoreOrders()}
-          />
+          <CompletedTab />
         </TabsContent>
 
         <TabsContent value="cancelled" className="mt-6">
-          <OrderList
-            orders={cancelledOrders}
-            isLoading={ordersLoading}
-            hasNextPage={hasMoreOrders}
-            isFetchingNextPage={fetchingMoreOrders}
-            onLoadMore={() => fetchMoreOrders()}
-          />
+          <CancelledTab />
         </TabsContent>
       </Tabs>
     </div>
