@@ -38,10 +38,10 @@ export function CreateRefundDialog({ order, open, onOpenChange }: CreateRefundDi
   const createRefund = useCreateRefund()
   const { data: transportOptions } = useListServiceOption({ category: "transport" })
 
-  const items: TOrderItem[] = order.Items ?? []
+  const items: TOrderItem[] = order.items ?? []
 
   const [selectedItemId, setSelectedItemId] = useState<number | null>(
-    items.length === 1 ? items[0].ID : null,
+    items.length === 1 ? items[0].id : null,
   )
   const [method, setMethod] = useState<RefundMethod>(RefundMethod.DropOff)
   const [reason, setReason] = useState("")
@@ -68,7 +68,7 @@ export function CreateRefundDialog({ order, open, onOpenChange }: CreateRefundDi
       toast.success("Refund request submitted")
       onOpenChange(false)
       // Reset form
-      setSelectedItemId(items.length === 1 ? items[0].ID : null)
+      setSelectedItemId(items.length === 1 ? items[0].id : null)
       setMethod(RefundMethod.DropOff)
       setReason("")
       setAddress("")
@@ -103,17 +103,17 @@ export function CreateRefundDialog({ order, open, onOpenChange }: CreateRefundDi
               >
                 {items.map((item) => (
                   <Label
-                    key={item.ID}
-                    htmlFor={`item-${item.ID}`}
+                    key={item.id}
+                    htmlFor={`item-${item.id}`}
                     className={cn(
                       "flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors hover:bg-accent/50",
-                      selectedItemId === item.ID && "border-primary bg-accent/30",
+                      selectedItemId === item.id && "border-primary bg-accent/30",
                     )}
                   >
-                    <RadioGroupItem value={item.ID.toString()} id={`item-${item.ID}`} />
+                    <RadioGroupItem value={item.id.toString()} id={`item-${item.id}`} />
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">{item.SkuName}</p>
-                      <p className="text-xs text-muted-foreground">Qty: {item.Quantity}</p>
+                      <p className="font-medium text-sm truncate">{item.sku_name}</p>
+                      <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
                     </div>
                   </Label>
                 ))}
@@ -185,7 +185,7 @@ export function CreateRefundDialog({ order, open, onOpenChange }: CreateRefundDi
                 </SelectTrigger>
                 <SelectContent>
                   {transportOptions.map((opt) => (
-                    <SelectItem key={opt.id} value={opt.method}>
+                    <SelectItem key={opt.id} value={opt.id}>
                       {opt.name}
                       {opt.description ? ` — ${opt.description}` : ""}
                     </SelectItem>
