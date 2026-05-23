@@ -1,12 +1,15 @@
 "use client"
 
-import { memo } from "react"
-import { useRouter } from "next/navigation"
-import { TRefund, RefundStatus } from "@/core/order/refund.buyer"
+import { memo, useState } from "react"
+import Link from "next/link"
+import { useCancelRefund, TRefund } from "@/core/order/refund.buyer"
+import { Status } from "@/core/common/status.type"
+import { CreateDisputeDialog } from "@/components/order/create-dispute-dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import { XCircle, Loader2, Scale, ExternalLink } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const statusConfig: Record<
@@ -54,76 +57,101 @@ function StageIndicator({ refund }: { refund: TRefund }) {
 }
 
 export const RefundCard = memo(function RefundCard({ refund }: { refund: TRefund }) {
-  const router = useRouter()
-  const config = statusConfig[refund.status] ?? {
-    label: refund.status as string,
-    className: "",
+  const cancelRefund = useCancelRefund()
+  const [confirmingCancel, setConfirmingCancel] = useState(false)
+  const [showDisputeDialog, setShowDisputeDialog] = useState(false)
+
+  const handleCancel = () => {
+    if (!confirmingCancel) {
+      setConfirmingCancel(true)
+      return
+    }
+    cancelRefund.mutate(
+      { id: refund.id },
+      { onSettled: () => setConfirmingCancel(false) }
+    )
   }
 
   return (
-    <Card>
-      <CardContent className="p-4">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex flex-col gap-0.5">
-            <span className="font-medium text-sm">Refund request</span>
-            <span className="text-xs text-muted-foreground">
-              #{refund.id.slice(0, 8)} &middot; Item #{refund.order_item_id}
-            </span>
-          </div>
-          <div className="flex flex-col items-end gap-1">
+    <>
+      <Card>
+        <CardContent className="p-4">
+          {/* Header: ID, Order ref, Date, Status */}
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex flex-col gap-0.5">
+              <span className="font-medium text-sm">
+                Refund request
+              </span>
+              <span className="text-xs text-muted-foreground">
+                #{refund.id.slice(0, 8)} &middot; Order #{refund.order_id.slice(0, 8)}
+              </span>
+            </div>
             <Badge
               variant="secondary"
-              className={cn("font-normal", config.className)}
+              className={cn("font-normal", statusColors[refund.status])}
             >
-              {config.label}
+              {statusLabels[refund.status]}
             </Badge>
-            {config.walletCredited && (
-              <span className="text-xs text-green-700 font-medium">Wallet credited</span>
-            )}
           </div>
-        </div>
 
-        {/* Stage indicator */}
-        <StageIndicator refund={refund} />
-
-        {/* Reason */}
-        <p className="text-sm text-muted-foreground line-clamp-2 mt-2">
-          {refund.reason}
-        </p>
-
-        {/* Rejection note */}
-        {refund.status === "Failed" && refund.rejection_note && (
-          <p className="text-sm text-red-600 mt-1">
-            <span className="font-medium">Rejection reason: </span>
-            {refund.rejection_note}
+          {/* Reason */}
+          <p className="text-sm text-muted-foreground line-clamp-2">
+            {refund.reason}
           </p>
-        )}
 
-        <Separator className="my-4" />
+          <Separator className="my-4" />
 
-        {/* Footer */}
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">
-            {new Date(refund.date_created).toLocaleDateString()}
-          </span>
+          {/* Footer: Date + Actions */}
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">
+              {new Date(refund.date_created).toLocaleDateString()}
+            </span>
 
-          <div className="flex gap-2">
-            {refund.status === "Failed" && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  // TODO: dispute creation
-                  router.push(`/account/disputes/new?refund_id=${refund.id}`)
-                }
-              >
-                Raise dispute
+            <div className="flex gap-2">
+              {refund.status === Status.Pending && (
+                <Button
+                  variant={confirmingCancel ? "destructive" : "outline"}
+                  size="sm"
+                  onClick={handleCancel}
+                  disabled={cancelRefund.isPending}
+                >
+                  {cancelRefund.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  ) : (
+                    <XCircle className="h-4 w-4 mr-1" />
+                  )}
+                  {confirmingCancel ? "Confirm Cancel" : "Cancel Refund"}
+                </Button>
+              )}
+
+              {refund.status === Status.Failed && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowDisputeDialog(true)}
+                  className="gap-1"
+                >
+                  <Scale className="h-4 w-4" />
+                  Open Dispute
+                </Button>
+              )}
+
+              <Button variant="ghost" size="sm" asChild>
+                <Link href={`/account/disputes?refund=${refund.id}`} className="gap-1">
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Disputes
+                </Link>
               </Button>
-            )}
+            </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+
+      <CreateDisputeDialog
+        refundId={refund.id}
+        open={showDisputeDialog}
+        onOpenChange={setShowDisputeDialog}
+      />
+    </>
   )
 })

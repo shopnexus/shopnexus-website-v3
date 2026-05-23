@@ -8,12 +8,14 @@ import { Status } from "../common/status.type"
 
 export type TRefundDispute = {
   id: string
-  refund_id: string
   account_id: string
+  refund_id: string
   reason: string
+  note: string
   status: Status
   date_created: string
-  date_updated: string
+  resolved_by_id: string | null
+  date_resolved: string | null
 }
 
 // ===== Hooks =====
@@ -21,10 +23,10 @@ export type TRefundDispute = {
 export const useCreateRefundDispute = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (params: { refund_id: string; reason: string }) =>
+    mutationFn: (params: { refund_id: string; reason: string; note: string }) =>
       customFetchStandard<TRefundDispute>(
         `order/refunds/${params.refund_id}/disputes`,
-        { method: "POST", body: JSON.stringify({ reason: params.reason }) }
+        { method: "POST", body: JSON.stringify({ reason: params.reason, note: params.note }) }
       ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["disputes"] })
@@ -32,11 +34,11 @@ export const useCreateRefundDispute = () => {
   })
 }
 
-export const useListRefundDisputes = (params: PaginationParams) =>
+export const useListRefundDisputes = (params?: PaginationParams) =>
   useInfiniteQueryPagination<TRefundDispute>(
-    ["disputes"],
+    ["disputes", params],
     "order/disputes",
-    params
+    params ?? { limit: 20 },
   )
 
 export const useListRefundDisputesByRefund = (
@@ -44,14 +46,15 @@ export const useListRefundDisputesByRefund = (
   params: PaginationParams
 ) =>
   useInfiniteQueryPagination<TRefundDispute>(
-    ["disputes", "refund", refundId],
+    ["disputes", "refund", refundId, params],
     `order/refunds/${refundId}/disputes`,
-    params
+    params ?? { limit: 20 },
   )
 
 export const useGetRefundDispute = (disputeId: string) =>
   useQuery({
     queryKey: ["disputes", disputeId],
-    queryFn: () => customFetchStandard<TRefundDispute>(`order/disputes/${disputeId}`),
+    queryFn: () =>
+      customFetchStandard<TRefundDispute>(`order/disputes/${disputeId}`),
     enabled: !!disputeId,
   })

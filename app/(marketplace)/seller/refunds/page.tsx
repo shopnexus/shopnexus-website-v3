@@ -32,6 +32,7 @@ import {
   Loader2,
   Clock,
   AlertCircle,
+  Scale,
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -318,6 +319,114 @@ export default function SellerRefundsPage() {
             />
           ))}
 
+            return (
+              <Card key={refund.id}>
+                <CardContent className="p-4">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                    <div className="space-y-2 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-medium">Refund request</h3>
+                        <Badge variant={status.variant} className="gap-1">
+                          <StatusIcon className="h-3 w-3" />
+                          {status.label}
+                        </Badge>
+                        <Badge variant="outline" className="gap-1">
+                          {refund.method === RefundMethod.PickUp ? (
+                            <>
+                              <Truck className="h-3 w-3" />
+                              Pick Up
+                            </>
+                          ) : (
+                            <>
+                              <MapPin className="h-3 w-3" />
+                              Drop Off
+                            </>
+                          )}
+                        </Badge>
+                      </div>
+
+                      <p className="text-sm text-muted-foreground">
+                        #{refund.id.slice(0, 8)} &middot; Order #{refund.order_id.slice(0, 8)} &middot; {formatDate(refund.date_created)}
+                      </p>
+
+                      <div className="flex items-start gap-2 text-sm">
+                        <AlertCircle className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                        <p className="text-muted-foreground">{refund.reason}</p>
+                      </div>
+
+                      {refund.address && (
+                        <div className="flex items-start gap-2 text-sm">
+                          <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                          <p className="text-muted-foreground">{refund.address}</p>
+                        </div>
+                      )}
+
+                      {refund.resources && refund.resources.length > 0 && (
+                        <div className="flex gap-2 mt-2">
+                          {refund.resources.slice(0, 3).map((resource, idx) => (
+                            <div
+                              key={idx}
+                              className="relative h-12 w-12 rounded bg-muted flex items-center justify-center overflow-hidden"
+                            >
+                              <Image
+                                src={resource.url}
+                                alt="Evidence"
+                                fill
+                                className="object-cover"
+                              />
+                            </div>
+                          ))}
+                          {refund.resources.length > 3 && (
+                            <div className="h-12 w-12 rounded bg-muted flex items-center justify-center text-xs text-muted-foreground">
+                              +{refund.resources.length - 3}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {statusStr === "Pending" && (
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setSelectedRefund(refund)
+                              setActionType("approve")
+                            }}
+                          >
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            Approve
+                          </Button>
+                      )}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem asChild>
+                            <Link href={`/seller/orders/${refund.order_id}`}>
+                              <Eye className="h-4 w-4 mr-2" />
+                              View Order
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link href={`/seller/disputes`}>
+                              <Scale className="h-4 w-4 mr-2" />
+                              View Disputes
+                            </Link>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
+
+          {/* Load More */}
           {hasNextPage && (
             <div className="text-center pt-4">
               <Button
