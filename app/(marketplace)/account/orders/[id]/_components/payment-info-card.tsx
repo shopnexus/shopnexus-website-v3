@@ -3,16 +3,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { CreditCard } from "lucide-react"
+import type { TPaymentSession } from "@/core/order/order.buyer"
 
 interface PaymentInfoCardProps {
-  payment: {
-    option: string
-    status: string
-    date_paid: string | null
-  } | null
+  confirmSession: TPaymentSession | null | undefined
 }
 
-export function PaymentInfoCard({ payment }: PaymentInfoCardProps) {
+export function PaymentInfoCard({ confirmSession }: PaymentInfoCardProps) {
   return (
     <Card>
       <CardHeader>
@@ -22,23 +19,19 @@ export function PaymentInfoCard({ payment }: PaymentInfoCardProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
-        {payment ? (
+        {confirmSession ? (
           <>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Method</span>
-              <span>{payment.option}</span>
-            </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Status</span>
               <Badge variant="secondary" className="font-normal">
-                {payment.status}
+                {confirmSession.status}
               </Badge>
             </div>
-            {payment.date_paid && (
+            {confirmSession.date_paid && (
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Paid on</span>
                 <span>
-                  {new Date(payment.date_paid).toLocaleDateString()}
+                  {new Date(confirmSession.date_paid).toLocaleDateString()}
                 </span>
               </div>
             )}

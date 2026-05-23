@@ -12,20 +12,48 @@ import { Separator } from "@/components/ui/separator"
 import { XCircle, Loader2, Scale, ExternalLink } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-const statusLabels: Record<Status, string> = {
-  [Status.Pending]: "Pending",
-  [Status.Processing]: "Approved",
-  [Status.Success]: "Completed",
-  [Status.Canceled]: "Cancelled",
-  [Status.Failed]: "Rejected",
+const statusConfig: Record<
+  RefundStatus,
+  { label: string; className: string; walletCredited?: boolean }
+> = {
+  Pending: {
+    label: "Awaiting seller review",
+    className: "bg-blue-100 text-blue-800",
+  },
+  Processing: {
+    label: "Return shipping in progress",
+    className: "bg-yellow-100 text-yellow-800",
+  },
+  Success: {
+    label: "Refunded",
+    className: "bg-green-100 text-green-800",
+    walletCredited: true,
+  },
+  Failed: {
+    label: "Rejected",
+    className: "bg-red-100 text-red-800",
+  },
 }
 
-const statusColors: Record<Status, string> = {
-  [Status.Pending]: "bg-yellow-100 text-yellow-800",
-  [Status.Processing]: "bg-green-100 text-green-800",
-  [Status.Success]: "bg-green-100 text-green-800",
-  [Status.Canceled]: "bg-gray-100 text-gray-800",
-  [Status.Failed]: "bg-red-100 text-red-800",
+function StageIndicator({ refund }: { refund: TRefund }) {
+  const stages = [
+    { label: "Requested", done: true },
+    { label: "Seller accepted", done: refund.accepted_by_id !== null },
+    { label: "Refund approved", done: refund.approved_by_id !== null },
+  ]
+
+  return (
+    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+      {stages.map((stage, idx) => (
+        <span key={stage.label} className="flex items-center gap-1">
+          {idx > 0 && <span className="text-muted-foreground/50">›</span>}
+          <span className={cn(stage.done ? "text-foreground font-medium" : "")}>
+            {stage.label}
+          </span>
+        </span>
+      ))}
+    </div>
+  )
 }
 
 export const RefundCard = memo(function RefundCard({ refund }: { refund: TRefund }) {

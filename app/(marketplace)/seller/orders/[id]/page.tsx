@@ -2,10 +2,8 @@
 
 import { use } from "react"
 import Link from "next/link"
-import Image from "next/image"
 import { TOrder } from "@/core/order/order.buyer"
 import { useGetSellerOrder } from "@/core/order/order.seller"
-import { ProductLink } from "@/components/product/product-link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -40,12 +38,12 @@ function AccountName({ id, fallback = "User" }: { id: string; fallback?: string 
 }
 
 function getOrderDisplayStatus(order: TOrder): { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: React.ElementType } {
-  const ps = order.payment?.status
+  const cs = order.confirm_session?.status
   const ts = order.transport?.status
-  if (!order.payment) return { label: "Unpaid", variant: "secondary", icon: Clock }
-  if (ps === "Pending") return { label: "Awaiting Payment", variant: "secondary", icon: Clock }
-  if (ps === "Failed") return { label: "Payment Failed", variant: "destructive", icon: XCircle }
-  if (ps === "Cancelled") return { label: "Cancelled", variant: "destructive", icon: XCircle }
+  if (!order.confirm_session) return { label: "Unpaid", variant: "secondary", icon: Clock }
+  if (cs === "Pending") return { label: "Awaiting Payment", variant: "secondary", icon: Clock }
+  if (cs === "Failed") return { label: "Payment Failed", variant: "destructive", icon: XCircle }
+  if (cs === "Cancelled") return { label: "Cancelled", variant: "destructive", icon: XCircle }
   if (ts === "Delivered") return { label: "Completed", variant: "outline", icon: Package }
   if (ts === "InTransit" || ts === "OutForDelivery") return { label: "Shipping", variant: "default", icon: Truck }
   if (ts === "Failed" || ts === "Cancelled") return { label: "Delivery Failed", variant: "destructive", icon: XCircle }
@@ -79,12 +77,14 @@ export default function SellerOrderDetailPage({ params }: { params: Promise<{ id
   }
 
   const getCurrentStep = (order: TOrder) => {
-    const ps = order.payment?.status
+    const cs = order.confirm_session?.status
     const ts = order.transport?.status
-    if (ps === "Cancelled" || ps === "Failed") return -1
+    const ps = order.payout_session?.status
+    const terminal = (s?: string | null) => s === "Failed" || s === "Cancelled"
+    if (terminal(cs) || terminal(ts) || terminal(ps)) return -1
     if (ts === "Delivered") return 3
     if (ts === "InTransit" || ts === "OutForDelivery") return 2
-    if (ps === "Success") return 1
+    if (cs === "Success") return 1
     return 0
   }
 
@@ -160,7 +160,7 @@ export default function SellerOrderDetailPage({ params }: { params: Promise<{ id
             <StatusIcon className="h-3 w-3" />
             {status.label}
           </Badge>
-          {order.payment === null && (
+          {order.confirm_session === null && (
             <Badge variant="destructive" className="font-normal">
               Unpaid
             </Badge>
@@ -231,14 +231,10 @@ export default function SellerOrderDetailPage({ params }: { params: Promise<{ id
                   className="flex gap-4 p-4 bg-muted/50 rounded-lg"
                 >
                   <div className="relative h-16 w-16 rounded bg-muted flex items-center justify-center flex-shrink-0">
-                    {item.resources?.[0] ? (
-                      <Image src={item.resources[0].url} alt={item.sku_name} fill className="object-cover rounded" />
-                    ) : (
-                      <Package className="h-6 w-6 text-muted-foreground" />
-                    )}
+                    <Package className="h-6 w-6 text-muted-foreground" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <ProductLink spuId={item.spu_id} onClick={(e) => e.stopPropagation()}>{item.sku_name}</ProductLink>
+                    <p className="font-medium truncate">{item.sku_name}</p>
                     {item.note && (
                       <p className="text-sm text-muted-foreground truncate">
                         {item.note}
@@ -248,8 +244,8 @@ export default function SellerOrderDetailPage({ params }: { params: Promise<{ id
                       <span className="text-sm">Qty: {item.quantity}</span>
                       <span className="font-medium">
                         <Price
-                          amount={item.unit_price * item.quantity}
-                          currency={order.payment?.seller_currency || "VND"}
+                          amount={item.subtotal_amount}
+                          currency={order.confirm_session?.currency ?? "VND"}
                           emphasis="native-only"
                         />
                       </span>
@@ -313,7 +309,7 @@ export default function SellerOrderDetailPage({ params }: { params: Promise<{ id
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground">
-                  ID: {order.transport.id.slice(0, 8)}
+                  ID: {String(order.transport.id).slice(0, 8)}
                 </p>
                 <p className="text-sm text-muted-foreground">
                   Status: {order.transport.status}
@@ -331,17 +327,11 @@ export default function SellerOrderDetailPage({ params }: { params: Promise<{ id
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              {order.payment ? (
-                <>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Method</span>
-                    <span>{order.payment.option}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Status</span>
-                    <Badge variant="outline">{order.payment.status}</Badge>
-                  </div>
-                </>
+              {order.confirm_session ? (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Status</span>
+                  <Badge variant="outline">{order.confirm_session.status}</Badge>
+                </div>
               ) : (
                 <p className="text-sm text-muted-foreground">Awaiting payment from buyer</p>
               )}
@@ -354,45 +344,13 @@ export default function SellerOrderDetailPage({ params }: { params: Promise<{ id
               <CardTitle>Order Summary</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Subtotal</span>
-                <span>
-                  <Price
-                    amount={order.product_cost}
-                    currency={order.payment?.seller_currency || "VND"}
-                    emphasis="native-only"
-                  />
-                </span>
-              </div>
-              {order.product_discount > 0 && (
-                <div className="flex justify-between text-sm text-green-600">
-                  <span>Discount</span>
-                  <span>
-                    -<Price
-                      amount={order.product_discount}
-                      currency={order.payment?.seller_currency || "VND"}
-                      emphasis="native-only"
-                    />
-                  </span>
-                </div>
-              )}
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Shipping</span>
-                <span>
-                  <Price
-                    amount={order.transport_cost}
-                    currency={order.payment?.seller_currency || "VND"}
-                    emphasis="native-only"
-                  />
-                </span>
-              </div>
               <Separator className="my-2" />
               <div className="flex justify-between font-medium">
                 <span>Total</span>
                 <span>
                   <Price
-                    amount={order.total}
-                    currency={order.payment?.seller_currency || "VND"}
+                    amount={order.total_amount}
+                    currency={order.confirm_session?.currency ?? "VND"}
                     emphasis="native-only"
                   />
                 </span>

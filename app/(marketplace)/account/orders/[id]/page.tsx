@@ -25,14 +25,21 @@ function summarizeOrder(items?: Array<{ sku_name: string }>): string {
 import type { TOrder } from "@/core/order/order.buyer"
 
 function getOrderDisplayStatus(order: TOrder): { label: string; color: string } {
-	const ps = order.payment?.status
+	const cs = order.confirm_session?.status
 	const ts = order.transport?.status
-	if (ps === "Failed") return { label: "Payment Failed", color: "bg-red-100 text-red-800" }
-	if (ps === "Cancelled") return { label: "Cancelled", color: "bg-red-100 text-red-800" }
+	if (cs === "Failed") return { label: "Payment Failed", color: "bg-red-100 text-red-800" }
+	if (cs === "Cancelled") return { label: "Cancelled", color: "bg-red-100 text-red-800" }
 	if (ts === "Delivered") return { label: "Completed", color: "bg-green-100 text-green-800" }
 	if (ts === "InTransit" || ts === "OutForDelivery") return { label: "Shipping", color: "bg-purple-100 text-purple-800" }
 	if (ts === "Failed" || ts === "Cancelled") return { label: "Delivery Failed", color: "bg-red-100 text-red-800" }
 	return { label: "Processing", color: "bg-blue-100 text-blue-800" }
+}
+
+function isOrderCancelled(order: TOrder): boolean {
+	const terminal = (s?: string | null) => s === "Failed" || s === "Cancelled"
+	return terminal(order.confirm_session?.status) ||
+		terminal(order.transport?.status) ||
+		terminal(order.payout_session?.status)
 }
 
 export default function OrderDetailPage({
@@ -63,7 +70,7 @@ export default function OrderDetailPage({
 	}
 
 	const displayStatus = getOrderDisplayStatus(order)
-	const isCancelled = order.payment?.status === "Cancelled" || order.payment?.status === "Failed"
+	const isCancelled = isOrderCancelled(order)
 
 	return (
 		<div className="space-y-6">
@@ -90,7 +97,7 @@ export default function OrderDetailPage({
 			</div>
 
 			{/* Order Progress */}
-			{!isCancelled && <OrderProgress paymentStatus={order.payment?.status} transportStatus={order.transport?.status} />}
+			{!isCancelled && <OrderProgress confirmFeeStatus={order.confirm_session?.status} transportStatus={order.transport?.status} />}
 
 			{isCancelled && (
 				<Card className="border-destructive/50 bg-destructive/5">
@@ -111,7 +118,7 @@ export default function OrderDetailPage({
 				<div className="lg:col-span-2 space-y-6">
 					<OrderItemsCard
 						items={order.items}
-						currency={order.payment?.seller_currency || "VND"}
+						currency={order.confirm_session?.currency ?? "VND"}
 					/>
 
 					{/* Shipping Info */}
@@ -131,18 +138,15 @@ export default function OrderDetailPage({
 				{/* Order Summary */}
 				<div className="space-y-6">
 					<OrderSummaryCard
-						productCost={order.product_cost}
-						productDiscount={order.product_discount}
-						transportCost={order.transport_cost}
-						total={order.total}
-						currency={order.payment?.seller_currency || "VND"}
+						totalAmount={order.total_amount}
+						currency={order.confirm_session?.currency ?? "VND"}
 					/>
 
-					<PaymentInfoCard payment={order.payment} />
+					<PaymentInfoCard confirmSession={order.confirm_session} />
 
 					{/* Actions */}
 					<div className="space-y-2">
-						{order.payment?.status === "Success" && order.transport?.status === "Delivered" && (
+						{order.confirm_session?.status === "Success" && order.transport?.status === "Delivered" && (
 							<Button className="w-full" onClick={() => setShowRefundDialog(true)}>
 								Request Refund
 							</Button>
@@ -155,7 +159,7 @@ export default function OrderDetailPage({
 			</div>
 
 			<CreateRefundDialog
-				orderId={order.id}
+				order={order}
 				open={showRefundDialog}
 				onOpenChange={setShowRefundDialog}
 			/>

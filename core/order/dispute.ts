@@ -43,7 +43,7 @@ export const useListRefundDisputes = (params?: PaginationParams) =>
 
 export const useListRefundDisputesByRefund = (
   refundId: string,
-  params?: PaginationParams
+  params: PaginationParams
 ) =>
   useInfiniteQueryPagination<TRefundDispute>(
     ["disputes", "refund", refundId, params],

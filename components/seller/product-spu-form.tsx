@@ -5,6 +5,8 @@ import dynamic from "next/dynamic"
 import type { RichTextEditorRef } from "@/components/ui/rich-text-editor"
 import { ImageUpload, type UploadedImage } from "@/components/ui/image-upload"
 import { CategorySelect, TagSelect } from "@/components/ui/catalog-selects"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useCurrencyOptions } from "@/lib/countries"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -21,7 +23,8 @@ export type ProductSPUFormData = {
   name: string
   description: string
   category_id: string
-  is_active: boolean
+  currency: string
+  is_enabled: boolean
   tags: string[]
   resource_ids: string[]
   specifications: Array<{ name: string; value: string }>
@@ -31,7 +34,8 @@ export const defaultFormData: ProductSPUFormData = {
   name: "",
   description: "",
   category_id: "",
-  is_active: true,
+  currency: "VND",
+  is_enabled: true,
   tags: [],
   resource_ids: [],
   specifications: [],
@@ -50,6 +54,7 @@ interface ProductSPUFormProps {
 
 export function ProductSPUForm({ data, onChange, images, onImagesChange, afterName, formKey }: ProductSPUFormProps) {
   const descriptionRef = useRef<RichTextEditorRef>(null)
+  const currencyOptions = useCurrencyOptions()
 
   return (
     <div className="space-y-6">
@@ -95,14 +100,35 @@ export function ProductSPUForm({ data, onChange, images, onImagesChange, afterNa
             />
           </div>
 
+          <div className="space-y-2">
+            <Label htmlFor="currency">Currency *</Label>
+            <Select
+              value={data.currency}
+              onValueChange={(value) => onChange("currency", value)}
+            >
+              <SelectTrigger id="currency">
+                <SelectValue placeholder="Select currency" />
+              </SelectTrigger>
+              <SelectContent>
+                {currencyOptions.map((opt) => (
+                  <SelectItem key={opt.code} value={opt.code}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Prices for this product's SKUs are denominated in this currency.
+              Buyers see them converted to their wallet currency at checkout.
+            </p>
+          </div>
+
           <div className="flex items-center justify-between py-2">
             <div>
               <p className="font-medium">Active</p>
               <p className="text-sm text-muted-foreground">Make this product visible to customers</p>
             </div>
             <Switch
-              checked={data.is_active}
-              onCheckedChange={(checked) => onChange("is_active", checked)}
+              checked={data.is_enabled}
+              onCheckedChange={(checked) => onChange("is_enabled", checked)}
             />
           </div>
         </CardContent>

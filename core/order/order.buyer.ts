@@ -2,72 +2,122 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { customFetchStandard } from "@/lib/queryclient/custom-fetch"
 import { useInfiniteQueryPagination } from "@/lib/queryclient/use-infinite-query"
 import { PaginationParams } from "@/lib/queryclient/response.type"
-import { Resource } from "../common/resource.type"
 
 // ===== Types =====
+// Field names match Go's encoding/json serialization (explicit snake_case json tags).
+
+// Mirror of biz.SessionKind* — DB column is plain TEXT; this is the source of truth on FE.
+export const SessionKind = {
+  BuyerCheckout: "buyer-checkout",
+  SellerConfirmationFee: "seller-confirmation-fee",
+  SellerPayout: "seller-payout",
+} as const
+export type TSessionKind = (typeof SessionKind)[keyof typeof SessionKind]
+
+export type TPaymentSession = {
+  id: number
+  kind: TSessionKind | string
+  status: string
+  from_id: string | null
+  to_id: string | null
+  note: string
+  currency: string
+  total_amount: number
+  data: Record<string, unknown>
+
+  date_created: string
+  date_paid: string | null
+  date_expired: string
+}
+
+// Append-only ledger leg. One row per rail movement within a payment session.
+// Reversals are NEW rows (negative amount + reverses_id pointing to the original).
+export type TTransaction = {
+  id: number
+  session_id: number
+  status: string
+  note: string
+  error: string | null
+  payment_option: string | null
+  wallet_id: string | null
+  data: Record<string, unknown>
+
+  amount: number
+  from_currency: string
+  to_currency: string
+  exchange_rate: string // decimal.Decimal serialized as string
+
+  reverses_id: number | null
+
+  date_created: string
+  date_settled: string | null
+  date_expired: string | null // gateway URL expiry; null for internal wallet rails
+}
+
+export type TTransport = {
+  id: number
+  option: string
+  status: string | null
+  data: unknown
+  date_created: string
+}
 
 export type TOrderItem = {
   id: number
   order_id: string | null
   account_id: string
   seller_id: string
-  address: string
   sku_id: string
   spu_id: string
   sku_name: string
-  quantity: number
-  unit_price: number
-  paid_amount: number
+  address: string
   note: string | null
-  serial_ids: string[]
+  serial_ids: unknown
+
+  quantity: number
   transport_option: string
-  transport_cost_estimate: number
-  payment_id: number | null
+  subtotal_amount: number
+  total_amount: number
+  payment_session_id: number
+
   date_created: string
   date_cancelled: string | null
-  resources: Resource[]
-}
+  cancelled_by_id: string | null
 
-export type TTransport = {
-  id: string
-  option: string
-  status: string
-  cost: number
-  data: Record<string, any>
-  date_created: string
-}
+  // Hydrated from catalog by enrichItems on the server side.
+  slug: string
+  image_url: string
 
-export type TPayment = {
-  id: number
-  account_id: string
-  option: string
-  payment_method_id?: string
-  status: string
-  amount: number
-  buyer_currency?: string
-  seller_currency?: string
-  exchange_rate?: number
-  data: Record<string, any>
-  date_created: string
-  date_paid: string | null
-  date_expired: string
+  // Derived (optional loaded on buyer pending list):
+  payment_session?: TPaymentSession | null
 }
 
 export type TOrder = {
   id: string
   buyer_id: string
   seller_id: string
-  transport: TTransport | null
-  payment: TPayment | null
+  transport_id: number
   address: string
-  product_cost: number
-  product_discount: number
-  transport_cost: number
-  total: number
-  note: string | null
-  data: Record<string, any>
   date_created: string
+
+  confirmed_by_id: string
+  confirm_session_id: number
+  note: string | null
+
+  // Derived (optional loaded):
+  total_amount: number
   items: TOrderItem[]
+  transport: TTransport | null
+  confirm_session: TPaymentSession | null
+  payout_session: TPaymentSession | null
+}
+
+// BuyerCheckoutResult — sync envelope from POST /order/buyer/checkout. The
+// workflow runs async; this response only carries the workflow ID + the
+// gateway redirect URL (empty for wallet-only checkouts).
+export type TBuyerCheckoutResult = {
+  checkout_session_id: string
+  payment_url: string
 }
 
 // ===== Hooks =====
@@ -87,13 +137,7 @@ export const useBuyerCheckout = () => {
         transport_option: string
         note?: string
       }>
-    }) => customFetchStandard<{
-      items: TOrderItem[]
-      payment: TPayment | null
-      redirect_url: string | null
-      wallet_deducted: number
-      total: number
-    }>(`order/buyer/checkout`, {
+    }) => customFetchStandard<TBuyerCheckoutResult>(`order/buyer/checkout`, {
       method: 'POST',
       body: JSON.stringify(params),
     }),
@@ -105,11 +149,67 @@ export const useBuyerCheckout = () => {
   })
 }
 
+// EnsurePaymentURL — multi-attempt entry point. Returns the latest reusable
+// gateway URL when the current attempt is alive, otherwise BE signals the
+// workflow to mint the next attempt. 410 if the session is already terminal.
+export type TEnsurePaymentURLResult = { payment_url: string }
+
+export const useEnsureBuyerPaymentURL = () => {
+  return useMutation({
+    mutationKey: ['order', 'buyer', 'checkout', 'payment-url'],
+    mutationFn: (sessionID: string) =>
+      customFetchStandard<TEnsurePaymentURLResult>(
+        `order/buyer/checkout/${sessionID}/payment-url`,
+        { method: 'POST' },
+      ),
+  })
+}
+
+// QuoteTransport — preview per-item shipping cost without reserving stock.
+// Mirrors the per-item quote loop the workflow runs at checkout, so the cart
+// summary shows the same number the buyer will be charged.
+export type TQuoteTransportItem = {
+  sku_id: string
+  transport_option: string
+  cost: number
+  currency: string
+}
+
+export type TQuoteTransportResult = {
+  items: TQuoteTransportItem[]
+}
+
+export type TQuoteTransportParams = {
+  address: string
+  items: Array<{
+    sku_id: string
+    quantity: number
+    transport_option: string
+    note?: string
+  }>
+}
+
+export const useQuoteBuyerTransport = (
+  params: TQuoteTransportParams | null,
+) => {
+  return useQuery({
+    queryKey: ['order', 'buyer', 'quote-transport', params],
+    queryFn: () =>
+      customFetchStandard<TQuoteTransportResult>('order/buyer/quote-transport', {
+        method: 'POST',
+        body: JSON.stringify(params),
+      }),
+    enabled: !!params && params.items.length > 0 && !!params.address,
+    staleTime: 30_000,
+    retry: false,
+  })
+}
+
 export const useListBuyerPendingItems = (params: PaginationParams) =>
   useInfiniteQueryPagination<TOrderItem>(
     ['order', 'buyer', 'pending-items'],
-    'order/buyer/pending',
-    params
+    'order/buyer/pending-items',
+    params,
   )
 
 export const useCancelBuyerPending = () => {
@@ -117,11 +217,16 @@ export const useCancelBuyerPending = () => {
   return useMutation({
     mutationKey: ['order', 'buyer', 'pending-items', 'cancel'],
     mutationFn: (id: number) =>
-      customFetchStandard<void>(`order/buyer/pending/${id}`, {
+      customFetchStandard<void>(`order/buyer/pending-items/${id}`, {
         method: 'DELETE',
       }),
     onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ['order', 'buyer', 'pending-items'] })
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['order', 'buyer', 'pending-items'] }),
+        qc.invalidateQueries({ queryKey: ['order', 'buyer', 'cancelled-items'] }),
+        qc.invalidateQueries({ queryKey: ['order', 'buyer', 'pending-orders'] }),
+        qc.invalidateQueries({ queryKey: ['order', 'buyer', 'cancelled-orders'] }),
+      ])
     },
   })
 }
@@ -130,23 +235,61 @@ export const useCancelBuyerPending = () => {
 export const useGetBuyerOrder = (id: string) =>
   useQuery({
     queryKey: ['order', id],
-    queryFn: () => customFetchStandard<TOrder>(`order/buyer/confirmed/${id}`),
+    queryFn: () => customFetchStandard<TOrder>(`order/buyer/orders/${id}`),
     enabled: !!id,
   })
 
-export const useListBuyerConfirmed = (params: PaginationParams) =>
+export type TCheckoutSummaryItem = {
+  id: number
+  sku_id: string
+  spu_id: string
+  slug: string
+  sku_name: string
+  quantity: number
+  total_amount: number
+  currency: string
+  image_url: string
+}
+
+export type TCheckoutSummary = {
+  session: TPaymentSession
+  items: TCheckoutSummaryItem[]
+}
+
+export const useGetCheckoutSummary = (txID: string | null) =>
+  useQuery({
+    queryKey: ['order', 'buyer', 'checkout-summary', txID],
+    queryFn: () =>
+      customFetchStandard<TCheckoutSummary>(
+        `order/buyer/checkout-summary/${txID}`,
+      ),
+    enabled: !!txID,
+  })
+
+export const useListBuyerPendingOrders = (params: PaginationParams) =>
   useInfiniteQueryPagination<TOrder>(
-    ['order', 'buyer', 'confirmed'],
-    'order/buyer/confirmed',
-    params
+    ['order', 'buyer', 'pending-orders'],
+    'order/buyer/pending-orders',
+    params,
   )
 
-export const useGetBuyerOverview = () => {
-  const pending = useListBuyerPendingItems({ limit: 20 })
-  const confirmed = useListBuyerConfirmed({ limit: 20 })
-  return {
-    pendingItems: pending.data?.pages.flatMap(p => p.data) ?? [],
-    orders: confirmed.data?.pages.flatMap(p => p.data) ?? [],
-    isLoading: pending.isLoading || confirmed.isLoading,
-  }
-}
+export const useListBuyerCompletedOrders = (params: PaginationParams) =>
+  useInfiniteQueryPagination<TOrder>(
+    ['order', 'buyer', 'completed-orders'],
+    'order/buyer/completed-orders',
+    params,
+  )
+
+export const useListBuyerCancelledOrders = (params: PaginationParams) =>
+  useInfiniteQueryPagination<TOrder>(
+    ['order', 'buyer', 'cancelled-orders'],
+    'order/buyer/cancelled-orders',
+    params,
+  )
+
+export const useListBuyerCancelledItems = (params: PaginationParams) =>
+  useInfiniteQueryPagination<TOrderItem>(
+    ['order', 'buyer', 'cancelled-items'],
+    'order/buyer/cancelled-items',
+    params,
+  )

@@ -1,11 +1,11 @@
 "use client"
 
 import Image from "next/image"
-import { ProductLink } from "@/components/product/product-link"
+import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { useExchangeRates, usePreferredCurrency } from "@/core/common/currency"
+import { useExchangeRates, useCurrency } from "@/core/common/currency"
 import { formatPriceInline } from "@/lib/money"
-import { Package } from "lucide-react"
+import { ImageOff } from "lucide-react"
 
 interface OrderItemsCardProps {
 	items: {
@@ -13,67 +13,87 @@ interface OrderItemsCardProps {
 		sku_name: string
 		sku_id: string
 		spu_id: string
+		slug?: string
+		image_url?: string
 		quantity: number
-		unit_price: number
+		subtotal_amount: number
 		note?: string | null
-		resources?: { url: string }[]
 	}[]
 	currency: string
 }
 
 export function OrderItemsCard({ items, currency }: OrderItemsCardProps) {
-	const preferred = usePreferredCurrency()
+	const preferred = useCurrency()
 	const { data: rateData } = useExchangeRates()
 	return (
 		<Card>
 			<CardHeader>
 				<CardTitle>Order Items ({items.length})</CardTitle>
 			</CardHeader>
-			<CardContent className="space-y-4">
-				{items.map((item) => (
-					<div key={item.id} className="flex gap-4">
-						<div className="relative h-20 w-20 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-							{item.resources?.[0] ? (
+			<CardContent className="divide-y -mx-6 px-0">
+				{items.map((item) => {
+					const linkTarget = item.slug ? `/product/${item.slug}` : null
+					const Thumb = (
+						<div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-muted">
+							{item.image_url ? (
 								<Image
-									src={item.resources[0].url}
+									src={item.image_url}
 									alt={item.sku_name}
 									fill
-									className="object-cover rounded-lg"
+									className="object-cover"
+									sizes="80px"
+									unoptimized
 								/>
 							) : (
-								<Package className="h-8 w-8 text-muted-foreground" />
+								<div className="absolute inset-0 grid place-items-center text-muted-foreground">
+									<ImageOff className="h-6 w-6" />
+								</div>
 							)}
 						</div>
-						<div className="flex-1 min-w-0">
-							<ProductLink
-								spuId={item.spu_id}
-								onClick={(e) => e.stopPropagation()}
-							>
-								{item.sku_name}
-							</ProductLink>
-							{item.note && (
-								<p className="text-sm text-muted-foreground truncate">
-									{item.note}
-								</p>
+					)
+					return (
+						<div key={item.id} className="flex gap-4 px-6 py-4 first:pt-0 last:pb-0">
+							{linkTarget ? (
+								<Link href={linkTarget} className="shrink-0">
+									{Thumb}
+								</Link>
+							) : (
+								Thumb
 							)}
-
-							<div className="flex items-center justify-between mt-2">
-								<p className="text-sm text-muted-foreground">
-									Qty: {item.quantity}
-								</p>
-								<span className="font-medium">
-									{formatPriceInline(
-										item.unit_price * item.quantity,
-										currency,
-										preferred,
-										rateData?.rates,
-										"native",
-									)}
-								</span>
+							<div className="flex-1 min-w-0">
+								{linkTarget ? (
+									<Link
+										href={linkTarget}
+										className="font-medium hover:underline line-clamp-2"
+									>
+										{item.sku_name}
+									</Link>
+								) : (
+									<p className="font-medium line-clamp-2">{item.sku_name}</p>
+								)}
+								{item.note && (
+									<p className="text-sm text-muted-foreground italic mt-1 truncate">
+										Note: {item.note}
+									</p>
+								)}
+								<div className="flex items-center justify-between mt-2">
+									<p className="text-sm text-muted-foreground">
+										Qty {item.quantity}
+									</p>
+									<span className="font-semibold tabular-nums">
+										{formatPriceInline(
+											item.subtotal_amount,
+											currency,
+											preferred,
+											rateData?.rates,
+											"native",
+										)}
+									</span>
+								</div>
 							</div>
 						</div>
-					</div>
-				))}
+					)
+				})}
 			</CardContent>
 		</Card>
 	)

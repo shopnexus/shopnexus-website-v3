@@ -46,7 +46,8 @@ export type ProductSPU = {
   featured_sku_id: string | null
   name: string
   description: string
-  is_active: boolean
+  currency: string
+  is_enabled: boolean
   date_created: string
   date_updated: string
 
@@ -66,7 +67,7 @@ export const useListProductSPU = (params: PaginationParams<{
   search?: string
   my_products?: boolean
   category_id?: string[]
-  is_active?: boolean[]
+  is_enabled?: boolean[]
 }>) =>
   useInfiniteQueryPagination<ProductSPU>(
     ['product-spu', 'list', params],
@@ -82,7 +83,8 @@ export const useCreateProductSPU = () => {
       category_id: string
       name: string
       description: string
-      is_active: boolean
+      currency: string
+      is_enabled: boolean
       tags: string[]
       resource_ids?: string[]
       specifications?: Array<{ name: string; value: string }>
@@ -107,7 +109,8 @@ export const useUpdateProductSPU = () => {
       featured_sku_id?: string
       name?: string
       description?: string
-      is_active?: boolean
+      currency?: string
+      is_enabled?: boolean
       regenerate_slug?: boolean
       tags?: string[]
       resource_ids?: string[]

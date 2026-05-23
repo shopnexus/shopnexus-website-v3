@@ -14,7 +14,7 @@ export type TProductDetail = {
   seller_id: string
   name: string
   description: string
-  is_active: boolean
+  is_enabled: boolean
   currency: string
   category: Category
   is_favorite: boolean
@@ -44,7 +44,7 @@ export type TProductCard = {
   category_id: string
   name: string
   description: string
-  is_active: boolean
+  is_enabled: boolean
   currency: string
   date_created: string
   date_updated: string

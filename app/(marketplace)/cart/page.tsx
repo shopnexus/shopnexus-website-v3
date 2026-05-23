@@ -4,7 +4,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { useRequireAuth } from "@/core/account/auth"
 import { useGetCart, useUpdateCart, useClearCart } from "@/core/order/cart"
-import { useExchangeRates, usePreferredCurrency } from "@/core/common/currency"
+import { useExchangeRates, useCurrency } from "@/core/common/currency"
 import { convertMoney, formatMoney, formatPriceInline } from "@/lib/money"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -30,7 +30,7 @@ export default function CartPage() {
   if (!isAuthenticated) return null
   const updateCart = useUpdateCart()
   const clearCart = useClearCart()
-  const preferred = usePreferredCurrency()
+  const preferred = useCurrency()
   const { data: rateData } = useExchangeRates()
 
   const items = cart ?? []

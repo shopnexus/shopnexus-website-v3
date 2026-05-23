@@ -4,6 +4,14 @@ import { useInfiniteQueryPagination } from "@/lib/queryclient/use-infinite-query
 import { PaginationParams } from "@/lib/queryclient/response.type"
 import { TOrder, TOrderItem } from "./order.buyer"
 
+// ConfirmSellerPendingResult — sync envelope from POST /order/seller/pending/confirm.
+// The workflow runs async; this response carries the workflow ID + the gateway
+// redirect URL (empty for wallet-only confirms).
+export type TConfirmSellerPendingResult = {
+  confirm_session_id: string
+  payment_url: string
+}
+
 // ===== Hooks =====
 
 export const useListSellerPendingItems = (params: PaginationParams) =>
@@ -19,9 +27,12 @@ export const useConfirmSellerPending = () => {
     mutationKey: ['order', 'seller', 'pending-items', 'confirm'],
     mutationFn: (params: {
       item_ids: number[]
+      use_wallet: boolean
+      payment_option: string
+      wallet_id?: string
       note?: string
     }) =>
-      customFetchStandard<TOrder>(`order/seller/pending/confirm`, {
+      customFetchStandard<TConfirmSellerPendingResult>(`order/seller/pending/confirm`, {
         method: 'POST',
         body: JSON.stringify(params),
       }),

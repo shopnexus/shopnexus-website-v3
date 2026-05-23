@@ -99,7 +99,7 @@ formatPriceInline(2999, "USD", "VND", rates)
 ### Currency
 
 - Money: `@/lib/money` — `formatMoney`, `convertMoney`, `getCurrencyName`, `formatPriceInline` (Intl-based, zero dep)
-- Hooks: `@/core/common/currency` — `useExchangeRates`, `usePreferredCurrency`, `useUpdatePreferredCurrency`
+- Hooks: `@/core/common/currency` — `useExchangeRates`, `useCurrency` (derived server-side from `me.country`)
 - Component: `@/components/ui/price` — `<Price amount={} currency={} emphasis={} />`
 - Currency picker: `@/components/ui/currency-picker` — `<CurrencyPicker value={} supported={} onChange={} />`
 
