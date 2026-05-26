@@ -24,13 +24,16 @@ function summarizeOrder(items?: Array<{ sku_name: string }>): string {
 
 import type { TOrder } from "@/core/order/order.buyer"
 
+// Backend uses a single OrderStatus enum (Pending|Processing|Success|Cancelled|Failed)
+// for transport rows — there is no separate Delivered/InTransit enum. Success on a
+// transport row means delivered; Processing means in-transit.
 function getOrderDisplayStatus(order: TOrder): { label: string; color: string } {
 	const cs = order.confirm_session?.status
 	const ts = order.transport?.status
 	if (cs === "Failed") return { label: "Payment Failed", color: "bg-red-100 text-red-800" }
 	if (cs === "Cancelled") return { label: "Cancelled", color: "bg-red-100 text-red-800" }
-	if (ts === "Delivered") return { label: "Completed", color: "bg-green-100 text-green-800" }
-	if (ts === "InTransit" || ts === "OutForDelivery") return { label: "Shipping", color: "bg-purple-100 text-purple-800" }
+	if (ts === "Success") return { label: "Completed", color: "bg-green-100 text-green-800" }
+	if (ts === "Processing") return { label: "Shipping", color: "bg-purple-100 text-purple-800" }
 	if (ts === "Failed" || ts === "Cancelled") return { label: "Delivery Failed", color: "bg-red-100 text-red-800" }
 	return { label: "Processing", color: "bg-blue-100 text-blue-800" }
 }
@@ -146,7 +149,7 @@ export default function OrderDetailPage({
 
 					{/* Actions */}
 					<div className="space-y-2">
-						{order.confirm_session?.status === "Success" && order.transport?.status === "Delivered" && (
+						{order.confirm_session?.status === "Success" && order.transport?.status === "Success" && (
 							<Button className="w-full" onClick={() => setShowRefundDialog(true)}>
 								Request Refund
 							</Button>

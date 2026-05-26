@@ -16,12 +16,18 @@ export enum AccountStatus {
   Suspended = 'Suspended',
 }
 
+export enum AccountRole {
+  Member = 'Member',
+  Admin = 'Admin',
+}
+
 export type AccountProfile = {
   id: string // UUID
   date_created: string
   date_updated: string
 
   status: AccountStatus
+  role: AccountRole
   phone: string | null
   email: string | null
   username: string | null

@@ -256,7 +256,10 @@ export type TCheckoutSummary = {
   items: TCheckoutSummaryItem[]
 }
 
-export const useGetCheckoutSummary = (txID: string | null) =>
+export const useGetCheckoutSummary = (
+  txID: string | null,
+  options?: { pollWhilePending?: boolean },
+) =>
   useQuery({
     queryKey: ['order', 'buyer', 'checkout-summary', txID],
     queryFn: () =>
@@ -264,6 +267,17 @@ export const useGetCheckoutSummary = (txID: string | null) =>
         `order/buyer/checkout-summary/${txID}`,
       ),
     enabled: !!txID,
+    // While the payment session is still non-terminal we poll every 2s so the
+    // result page flips to success/failed as soon as the gateway webhook lands,
+    // without forcing the buyer to refresh. Stops once status is terminal.
+    refetchInterval: options?.pollWhilePending
+      ? (query) => {
+          const status = query.state.data?.session.status
+          return status === 'Success' || status === 'Failed' || status === 'Cancelled'
+            ? false
+            : 2000
+        }
+      : false,
   })
 
 export const useListBuyerPendingOrders = (params: PaginationParams) =>

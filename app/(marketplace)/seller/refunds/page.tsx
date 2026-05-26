@@ -3,73 +3,50 @@
 import { useState } from "react"
 import {
   useListRefundsSeller,
-  useAcceptRefundStage1,
-  useApproveRefundStage2,
-  useRejectRefund,
+  useSellerApproveRefund,
 } from "@/core/order/refund.seller"
-import { TRefund, RefundMethod } from "@/core/order/refund.buyer"
+import { TRefund, RefundStatus } from "@/core/order/refund.buyer"
+import { CreateDisputeDialog } from "@/components/order/create-dispute-dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Textarea } from "@/components/ui/textarea"
-import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
   CheckCircle,
-  XCircle,
-  RotateCcw,
-  Truck,
-  MapPin,
   Loader2,
   Clock,
+  RotateCcw,
   AlertCircle,
   Scale,
+  Truck,
+  Package,
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 
-type RejectDialogState = {
-  refundId: string
-  stage: 1 | 2
-} | null
-
-const statusBadge: Record<string, { label: string; className: string }> = {
-  Pending: { label: "Pending", className: "bg-yellow-100 text-yellow-800" },
-  Processing: { label: "Processing", className: "bg-blue-100 text-blue-800" },
-  Success: { label: "Refunded", className: "bg-green-100 text-green-800" },
-  Failed: { label: "Rejected", className: "bg-red-100 text-red-800" },
+const statusBadge: Record<RefundStatus, { label: string; className: string }> = {
+  Shipping: { label: "Return in transit", className: "bg-blue-100 text-blue-800" },
+  AwaitingSellerReview: { label: "Awaiting your review", className: "bg-yellow-100 text-yellow-800" },
+  Disputed: { label: "Disputed — admin review", className: "bg-purple-100 text-purple-800" },
+  Accepted: { label: "Refunded", className: "bg-green-100 text-green-800" },
+  Rejected: { label: "Rejected — return shipped back", className: "bg-red-100 text-red-800" },
+  Cancelled: { label: "Withdrawn by buyer", className: "bg-gray-100 text-gray-800" },
 }
 
 function RefundRow({
   refund,
-  onAccept,
   onApprove,
-  onRejectOpen,
-  acceptPending,
+  onDisputeOpen,
   approvePending,
 }: {
   refund: TRefund
-  onAccept: (id: string) => void
   onApprove: (id: string) => void
-  onRejectOpen: (state: RejectDialogState) => void
-  acceptPending: boolean
+  onDisputeOpen: (refundId: string) => void
   approvePending: boolean
 }) {
-  const badge = statusBadge[refund.status] ?? statusBadge.Pending
-  const isStage1Actionable = refund.status === "Pending" && refund.accepted_by_id === null
-  const isStage2Actionable =
-    refund.status === "Processing" &&
-    refund.accepted_by_id !== null &&
-    refund.approved_by_id === null
+  const badge = statusBadge[refund.status] ?? statusBadge.Shipping
+  const isReviewable = refund.status === "AwaitingSellerReview"
 
   return (
     <Card>
@@ -78,34 +55,25 @@ function RefundRow({
           <div className="space-y-2 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-medium text-sm">#{refund.id.slice(0, 8)}</h3>
-              <Badge
-                variant="secondary"
-                className={cn("font-normal", badge.className)}
-              >
+              <Badge variant="secondary" className={cn("font-normal", badge.className)}>
                 {badge.label}
               </Badge>
               <Badge variant="outline" className="gap-1">
-                {refund.method === RefundMethod.PickUp ? (
-                  <>
-                    <Truck className="h-3 w-3" />
-                    Pick Up
-                  </>
-                ) : (
-                  <>
-                    <MapPin className="h-3 w-3" />
-                    Drop Off
-                  </>
-                )}
+                <Truck className="h-3 w-3" />
+                Return shipment #{refund.return_transport_id}
               </Badge>
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Item #{refund.order_item_id} &middot;{" "}
+              Order #{refund.order_id.slice(0, 8)} &middot;{" "}
               {new Date(refund.date_created).toLocaleDateString("en-US", {
                 month: "short",
                 day: "numeric",
                 year: "numeric",
               })}
+              {refund.date_received_by_seller && (
+                <> &middot; Received {new Date(refund.date_received_by_seller).toLocaleDateString()}</>
+              )}
             </p>
 
             <div className="flex items-start gap-2 text-sm">
@@ -113,56 +81,38 @@ function RefundRow({
               <p className="text-muted-foreground">{refund.reason}</p>
             </div>
 
-            {refund.address && (
-              <div className="flex items-start gap-2 text-sm">
-                <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                <p className="text-muted-foreground">{refund.address}</p>
+            {refund.attachments && refund.attachments.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {refund.attachments.slice(0, 6).map((att, idx) => (
+                  <a
+                    key={idx}
+                    href={att.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block h-14 w-14 overflow-hidden rounded border bg-muted"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={att.url}
+                      alt={att.name || `evidence ${idx + 1}`}
+                      className="h-full w-full object-cover"
+                    />
+                  </a>
+                ))}
               </div>
             )}
 
-            {refund.status === "Failed" && (
+            {refund.status === "Rejected" && refund.rejection_reason && (
               <p className="text-sm text-muted-foreground">
-                Rejected — {refund.rejection_note}
+                Admin upheld dispute — {refund.rejection_reason}
               </p>
             )}
           </div>
 
-          {/* Action buttons */}
           <div className="flex items-center gap-2 flex-shrink-0">
-            {isStage1Actionable && (
+            {isReviewable && (
               <>
-                <Button
-                  size="sm"
-                  onClick={() => onAccept(refund.id)}
-                  disabled={acceptPending}
-                >
-                  {acceptPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <>
-                      <CheckCircle className="h-4 w-4 mr-1" />
-                      Accept return
-                    </>
-                  )}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onRejectOpen({ refundId: refund.id, stage: 1 })}
-                >
-                  <XCircle className="h-4 w-4 mr-1" />
-                  Reject
-                </Button>
-              </>
-            )}
-
-            {isStage2Actionable && (
-              <>
-                <Button
-                  size="sm"
-                  onClick={() => onApprove(refund.id)}
-                  disabled={approvePending}
-                >
+                <Button size="sm" onClick={() => onApprove(refund.id)} disabled={approvePending}>
                   {approvePending ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
@@ -172,24 +122,24 @@ function RefundRow({
                     </>
                   )}
                 </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onRejectOpen({ refundId: refund.id, stage: 2 })}
-                >
-                  <XCircle className="h-4 w-4 mr-1" />
-                  Reject
+                <Button size="sm" variant="outline" onClick={() => onDisputeOpen(refund.id)}>
+                  <Scale className="h-4 w-4 mr-1" />
+                  Dispute
                 </Button>
               </>
             )}
 
-            {refund.status === "Success" && (
-              <Badge
-                variant="secondary"
-                className="bg-green-100 text-green-800 font-normal"
-              >
+            {refund.status === "Accepted" && (
+              <Badge variant="secondary" className="bg-green-100 text-green-800 font-normal">
                 <CheckCircle className="h-3 w-3 mr-1" />
                 Refunded
+              </Badge>
+            )}
+
+            {refund.status === "Rejected" && (
+              <Badge variant="secondary" className="bg-red-100 text-red-800 font-normal">
+                <Package className="h-3 w-3 mr-1" />
+                Returned to buyer
               </Badge>
             )}
           </div>
@@ -201,63 +151,28 @@ function RefundRow({
 
 export default function SellerRefundsPage() {
   const [activeTab, setActiveTab] = useState("all")
-  const [rejectDialog, setRejectDialog] = useState<RejectDialogState>(null)
-  const [rejectionNote, setRejectionNote] = useState("")
-  const [pendingAcceptId, setPendingAcceptId] = useState<string | null>(null)
   const [pendingApproveId, setPendingApproveId] = useState<string | null>(null)
+  const [disputeRefundId, setDisputeRefundId] = useState<string | null>(null)
 
-  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useListRefundsSeller({
-      limit: 20,
-      ...(activeTab !== "all" ? { status: activeTab } : {}),
-    })
+  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useListRefundsSeller({
+    limit: 20,
+    ...(activeTab !== "all" ? { status: activeTab } : {}),
+  })
 
-  const acceptMutation = useAcceptRefundStage1()
-  const approveMutation = useApproveRefundStage2()
-  const rejectMutation = useRejectRefund()
+  const approveMutation = useSellerApproveRefund()
 
   const refunds = data?.pages.flatMap((page) => page.data) ?? []
-
-  const handleAccept = async (id: string) => {
-    setPendingAcceptId(id)
-    try {
-      await acceptMutation.mutateAsync({ id })
-    } catch {
-      toast.error("Failed to accept return.")
-    } finally {
-      setPendingAcceptId(null)
-    }
-  }
 
   const handleApprove = async (id: string) => {
     setPendingApproveId(id)
     try {
       await approveMutation.mutateAsync({ id })
+      toast.success("Refund approved. Buyer wallet credited.")
     } catch {
       toast.error("Failed to approve refund.")
     } finally {
       setPendingApproveId(null)
     }
-  }
-
-  const handleRejectSubmit = async () => {
-    if (!rejectDialog || !rejectionNote.trim()) return
-
-    rejectMutation.mutate(
-      {
-        id: rejectDialog.refundId,
-        stage: rejectDialog.stage,
-        rejection_note: rejectionNote.trim(),
-      },
-      {
-        onSuccess: () => {
-          toast.success("Refund rejected.")
-          setRejectDialog(null)
-          setRejectionNote("")
-        },
-        onError: () => toast.error("Failed to reject refund."),
-      },
-    )
   }
 
   return (
@@ -267,21 +182,23 @@ export default function SellerRefundsPage() {
         <p className="text-muted-foreground">Review and process refund requests</p>
       </div>
 
-      {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="Pending">
-            <Clock className="h-3.5 w-3.5 mr-1" />
-            Pending
+          <TabsTrigger value="Shipping">
+            <Truck className="h-3.5 w-3.5 mr-1" />
+            Incoming
           </TabsTrigger>
-          <TabsTrigger value="Processing">Processing</TabsTrigger>
-          <TabsTrigger value="Success">Refunded</TabsTrigger>
-          <TabsTrigger value="Failed">Rejected</TabsTrigger>
+          <TabsTrigger value="AwaitingSellerReview">
+            <Clock className="h-3.5 w-3.5 mr-1" />
+            Awaiting You
+          </TabsTrigger>
+          <TabsTrigger value="Disputed">Disputed</TabsTrigger>
+          <TabsTrigger value="Accepted">Refunded</TabsTrigger>
+          <TabsTrigger value="Rejected">Rejected</TabsTrigger>
         </TabsList>
       </Tabs>
 
-      {/* Refund List */}
       {isLoading ? (
         <div className="space-y-4">
           {[...Array(5)].map((_, i) => (
@@ -311,22 +228,15 @@ export default function SellerRefundsPage() {
             <RefundRow
               key={refund.id}
               refund={refund}
-              onAccept={handleAccept}
               onApprove={handleApprove}
-              onRejectOpen={setRejectDialog}
-              acceptPending={pendingAcceptId === refund.id}
+              onDisputeOpen={setDisputeRefundId}
               approvePending={pendingApproveId === refund.id}
             />
           ))}
 
-          {/* Load More */}
           {hasNextPage && (
             <div className="text-center pt-4">
-              <Button
-                variant="outline"
-                onClick={() => fetchNextPage()}
-                disabled={isFetchingNextPage}
-              >
+              <Button variant="outline" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
                 {isFetchingNextPage ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -341,66 +251,15 @@ export default function SellerRefundsPage() {
         </div>
       )}
 
-      {/* Reject Dialog */}
-      <Dialog
-        open={rejectDialog !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setRejectDialog(null)
-            setRejectionNote("")
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Reject Refund</DialogTitle>
-            <DialogDescription>
-              {rejectDialog?.stage === 1
-                ? "Reject the return request (stage 1). The buyer will not need to ship the item back."
-                : "Reject the refund after return (stage 2). Provide a reason for the rejection."}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3 py-2">
-            <Label htmlFor="rejection-note" className="font-medium">
-              Rejection reason <span className="text-destructive">*</span>
-            </Label>
-            <Textarea
-              id="rejection-note"
-              value={rejectionNote}
-              onChange={(e) => setRejectionNote(e.target.value)}
-              placeholder="Explain why this refund is being rejected..."
-              rows={3}
-            />
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setRejectDialog(null)
-                setRejectionNote("")
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleRejectSubmit}
-              disabled={!rejectionNote.trim() || rejectMutation.isPending}
-            >
-              {rejectMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Submitting...
-                </>
-              ) : (
-                "Submit reject"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {disputeRefundId && (
+        <CreateDisputeDialog
+          refundId={disputeRefundId}
+          open={true}
+          onOpenChange={(o) => {
+            if (!o) setDisputeRefundId(null)
+          }}
+        />
+      )}
     </div>
   )
 }

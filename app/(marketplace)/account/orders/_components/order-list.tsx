@@ -23,6 +23,9 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
+// Backend uses a single OrderStatus enum (Pending|Processing|Success|Cancelled|Failed)
+// for transport rows — there is no separate Delivered/InTransit enum. Success on a
+// transport row means delivered; Processing means in-transit.
 function getOrderDisplayStatus(order: TOrder): { label: string; color: string } {
   const cs = order.confirm_session?.status
   const ts = order.transport?.status
@@ -37,13 +40,13 @@ function getOrderDisplayStatus(order: TOrder): { label: string; color: string } 
       label: "Cancelled",
       color: "bg-destructive/10 text-destructive",
     }
-  if (ts === "Delivered")
+  if (ts === "Success")
     return {
       label: "Completed",
       color:
         "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200",
     }
-  if (ts === "InTransit" || ts === "OutForDelivery")
+  if (ts === "Processing")
     return {
       label: "Shipping",
       color:
@@ -140,7 +143,7 @@ export function OrderList({
         const orderCurrency = order.confirm_session?.currency ?? "VND"
         const reviewable =
           order.confirm_session?.status === "Success" &&
-          order.transport?.status === "Delivered" &&
+          order.transport?.status === "Success" &&
           order.items[0]
         return (
           <Card

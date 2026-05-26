@@ -30,13 +30,10 @@ import {
 
 type Outcome = "success" | "failed" | "pending"
 
-type Classified = {
-  outcome: Outcome
-  provider: "vnpay" | "sepay" | "unknown"
-  refID: string | null
-  message: string
-}
-
+// VNPay-only gateway error codes — kept so we can surface a useful failure
+// reason on the result page when the VNPay redirect carries them. Other
+// providers do not pass extra info; outcome is read from the transaction
+// status alone.
 const VNPAY_RESPONSE_MESSAGES: Record<string, string> = {
   "00": "Transaction completed.",
   "07": "Suspected fraudulent transaction.",
@@ -53,45 +50,24 @@ const VNPAY_RESPONSE_MESSAGES: Record<string, string> = {
   "99": "Other error.",
 }
 
-function classify(params: URLSearchParams): Classified {
-  const vnpResp = params.get("vnp_ResponseCode")
-  if (vnpResp !== null) {
-    return {
-      outcome: vnpResp === "00" ? "success" : "failed",
-      provider: "vnpay",
-      refID: params.get("vnp_TxnRef"),
-      message:
-        VNPAY_RESPONSE_MESSAGES[vnpResp] ??
-        `Gateway response code ${vnpResp}.`,
-    }
-  }
+// readRef extracts the transaction id from the redirect URL. We accept `ref`
+// (our normalized param) plus VNPay's `vnp_TxnRef` for backward compatibility
+// — VNPay always appends its own params to whatever return URL we register.
+function readRef(params: URLSearchParams): string | null {
+  return params.get("ref") ?? params.get("vnp_TxnRef")
+}
 
-  if (params.get("provider") === "sepay") {
-    const raw = params.get("outcome")
-    let outcome: Outcome = "pending"
-    if (raw === "success") outcome = "success"
-    else if (raw === "failed" || raw === "cancelled") outcome = "failed"
-    return {
-      outcome,
-      provider: "sepay",
-      refID: params.get("ref"),
-      message:
-        outcome === "success"
-          ? "Payment received."
-          : raw === "cancelled"
-            ? "Payment was cancelled."
-            : outcome === "failed"
-              ? "Payment was not completed."
-              : "Waiting for the bank to confirm your transfer.",
-    }
-  }
-
-  return {
-    outcome: "pending",
-    provider: "unknown",
-    refID: null,
-    message:
-      "We couldn’t detect a payment status in the URL. If you completed the payment, the order will update shortly.",
+// statusToOutcome maps the backend session status enum to the UI outcome.
+function statusToOutcome(status: string | undefined): Outcome {
+  switch (status) {
+    case "Success":
+      return "success"
+    case "Failed":
+    case "Cancelled":
+      return "failed"
+    default:
+      // Pending / Processing / undefined while loading
+      return "pending"
   }
 }
 
@@ -251,16 +227,38 @@ function OrderSummary({
 
 function ResultBody() {
   const params = useSearchParams()
-  const classified = useMemo(
-    () => classify(new URLSearchParams(params?.toString() ?? "")),
+  const refID = useMemo(
+    () => readRef(new URLSearchParams(params?.toString() ?? "")),
     [params],
   )
-  const style = OUTCOME_STYLE[classified.outcome]
-  const Icon = style.Icon
   const preferred = useCurrency()
   const { data: rateData } = useExchangeRates()
 
-  const summaryQuery = useGetCheckoutSummary(classified.refID)
+  // Single source of truth: fetch the transaction by ref. Outcome is derived
+  // from session.status — the redirect URL no longer carries outcome.
+  const summaryQuery = useGetCheckoutSummary(refID, { pollWhilePending: true })
+  const sessionStatus = summaryQuery.data?.session.status
+
+  // VNPay attaches its own response code; surface it as the message when
+  // present. Other providers fall back to a generic status message.
+  const vnpResponseCode = params?.get("vnp_ResponseCode") ?? null
+  const outcome = statusToOutcome(sessionStatus)
+  const message = useMemo(() => {
+    if (vnpResponseCode && VNPAY_RESPONSE_MESSAGES[vnpResponseCode]) {
+      return VNPAY_RESPONSE_MESSAGES[vnpResponseCode]
+    }
+    switch (outcome) {
+      case "success":
+        return "Payment received."
+      case "failed":
+        return "Payment was not completed."
+      default:
+        return "Waiting for the bank to confirm your transfer."
+    }
+  }, [outcome, vnpResponseCode])
+
+  const style = OUTCOME_STYLE[outcome]
+  const Icon = style.Icon
 
   return (
     <div className="container mx-auto max-w-3xl px-4 py-10 space-y-6">
@@ -279,23 +277,18 @@ function ResultBody() {
             <h1 className="text-2xl font-semibold tracking-tight">
               {style.title}
             </h1>
-            {classified.provider !== "unknown" && (
-              <Badge variant="outline" className="uppercase">
-                {classified.provider}
-              </Badge>
-            )}
           </div>
-          <p className="text-sm text-muted-foreground">{classified.message}</p>
-          {classified.refID && (
+          <p className="text-sm text-muted-foreground">{message}</p>
+          {refID && (
             <p className="text-xs text-muted-foreground font-mono break-all">
-              Ref: {classified.refID}
+              Ref: {refID}
             </p>
           )}
         </div>
       </div>
 
       {/* Order summary — only if we have a ref */}
-      {classified.refID ? (
+      {refID ? (
         summaryQuery.isLoading ? (
           <SummarySkeleton />
         ) : summaryQuery.data ? (
@@ -320,7 +313,7 @@ function ResultBody() {
       ) : null}
 
       {/* Helpers */}
-      {classified.outcome === "pending" && (
+      {outcome === "pending" && (
         <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-900 dark:text-amber-200">
           <RefreshCw className="h-3.5 w-3.5 mt-0.5 shrink-0 animate-spin [animation-duration:3s]" />
           <p>
@@ -329,7 +322,7 @@ function ResultBody() {
           </p>
         </div>
       )}
-      {classified.outcome === "failed" && (
+      {outcome === "failed" && (
         <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
           <XCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
           <p>

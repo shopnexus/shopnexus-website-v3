@@ -5,6 +5,12 @@ import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useLoginBasic } from "@/core/account/auth"
+import {
+  AccountRole,
+  type AccountProfile,
+} from "@/core/account/account"
+import { customFetchStandard } from "@/lib/queryclient/custom-fetch"
+import { getQueryClient } from "@/lib/queryclient/query-client"
 import { loginSchema, LoginFormData } from "@/lib/validations"
 import { toast } from "@/components/ui/sonner"
 import { Button } from "@/components/ui/button"
@@ -41,8 +47,24 @@ export default function LoginPage() {
       toast.success("Welcome back!", {
         description: "You have successfully signed in.",
       })
-      router.push("/")
-    } catch (err) {
+
+      // Fetch the profile right after tokens land so we can route admins
+      // straight to the dispute console instead of the storefront. Seed the
+      // ['account', 'me'] cache so useGetMe consumers don't refetch.
+      let me: AccountProfile | null = null
+      try {
+        me = await customFetchStandard<AccountProfile>("account/me")
+        getQueryClient().setQueryData(["account", "me"], me)
+      } catch {
+        // Profile fetch failed — fall through to the default landing page.
+      }
+
+      if (me?.role === AccountRole.Admin) {
+        router.push("/admin/disputes")
+      } else {
+        router.push("/")
+      }
+    } catch {
       toast.error("Login failed", {
         description: "Invalid email or password. Please try again.",
       })

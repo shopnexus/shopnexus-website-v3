@@ -1,11 +1,11 @@
 "use client"
 
 import { useState } from "react"
-import { useCreateRefundDispute } from "@/core/order/dispute"
+import { useSellerDisputeRefund } from "@/core/order/refund.seller"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import { ImageUpload, type UploadedImage } from "@/components/ui/image-upload"
 import {
   Dialog,
   DialogContent,
@@ -23,28 +23,33 @@ interface CreateDisputeDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
-export function CreateDisputeDialog({ refundId, open, onOpenChange }: CreateDisputeDialogProps) {
-  const createDispute = useCreateRefundDispute()
+// CreateDisputeDialog is the seller-side dispute escalation. Sellers fire
+// this from the refund queue when they don't want to honour a buyer's claim;
+// admin reviews the case. Photos of the received goods are mandatory.
+export function CreateDisputeDialog({
+  refundId,
+  open,
+  onOpenChange,
+}: CreateDisputeDialogProps) {
+  const dispute = useSellerDisputeRefund()
 
   const [reason, setReason] = useState("")
-  const [note, setNote] = useState("")
+  const [attachments, setAttachments] = useState<UploadedImage[]>([])
 
-  const canSubmit = reason.trim().length > 0 && note.trim().length > 0
+  const canSubmit = reason.trim().length > 0 && attachments.length > 0
 
   const handleSubmit = async () => {
     if (!canSubmit) return
-
     try {
-      await createDispute.mutateAsync({
-        refund_id: refundId,
+      await dispute.mutateAsync({
+        id: refundId,
         reason: reason.trim(),
-        note: note.trim(),
+        attachments: attachments.map((img) => ({ url: img.url, kind: "image" })),
       })
-      toast.success("Dispute submitted successfully. We'll review your case shortly.")
+      toast.success("Dispute submitted. Admin will review the case.")
       onOpenChange(false)
-      // Reset form
       setReason("")
-      setNote("")
+      setAttachments([])
     } catch {
       toast.error("Failed to submit dispute. Please try again.")
     }
@@ -56,42 +61,46 @@ export function CreateDisputeDialog({ refundId, open, onOpenChange }: CreateDisp
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Scale className="h-5 w-5" />
-            Open Dispute
+            Dispute Refund
           </DialogTitle>
           <DialogDescription>
-            If you disagree with the refund decision, you can open a dispute. Our team will review the case and make a final decision.
+            Disputing escalates the refund to platform staff. Provide a reason
+            and photos of the items you received so the admin can decide.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5 py-2">
-          {/* Reason */}
           <div className="space-y-2">
-            <Label htmlFor="dispute-reason" className="font-medium">Reason</Label>
+            <Label htmlFor="dispute-reason" className="font-medium">
+              Reason <span className="text-destructive">*</span>
+            </Label>
             <Input
               id="dispute-reason"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="e.g., Item was defective, not as described..."
+              placeholder="e.g., Item not as described, wrong serial, fraud..."
               maxLength={1000}
             />
-            <p className="text-xs text-muted-foreground text-right">{reason.length}/1000</p>
+            <p className="text-xs text-muted-foreground text-right">
+              {reason.length}/1000
+            </p>
           </div>
 
-          {/* Note / Supporting Details */}
           <div className="space-y-2">
-            <Label htmlFor="dispute-note" className="font-medium">Supporting Details</Label>
+            <Label className="font-medium">
+              Evidence Photos <span className="text-destructive">*</span>
+            </Label>
             <p className="text-xs text-muted-foreground">
-              Provide additional context, evidence references, or details to support your dispute.
+              Photos of the returned items as you received them. At least one
+              photo is required.
             </p>
-            <Textarea
-              id="dispute-note"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="Explain why you believe the refund should be reconsidered..."
-              maxLength={2000}
-              rows={4}
+            <ImageUpload
+              value={attachments}
+              onChange={setAttachments}
+              maxFiles={10}
+              maxSizeInMB={5}
+              aspectRatio="square"
             />
-            <p className="text-xs text-muted-foreground text-right">{note.length}/2000</p>
           </div>
         </div>
 
@@ -101,9 +110,9 @@ export function CreateDisputeDialog({ refundId, open, onOpenChange }: CreateDisp
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={!canSubmit || createDispute.isPending}
+            disabled={!canSubmit || dispute.isPending}
           >
-            {createDispute.isPending ? (
+            {dispute.isPending ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 Submitting...

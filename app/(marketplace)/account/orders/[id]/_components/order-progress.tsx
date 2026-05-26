@@ -18,11 +18,16 @@ interface OrderProgressProps {
 }
 
 export function OrderProgress({ confirmFeeStatus, transportStatus }: OrderProgressProps) {
+  // Backend transport rows share the generic OrderStatus enum, so we map:
+  //   Pending    → step 2 (Processing, awaiting carrier pickup)
+  //   Processing → step 3 (Shipped, in-transit)
+  //   Success    → step 4 (Delivered)
+  // Failed/Cancelled fall outside the happy path and are handled by the caller.
   let currentStepIndex = 0
   if (confirmFeeStatus === "Success") currentStepIndex = 1
-  if (transportStatus === "LabelCreated") currentStepIndex = 2
-  if (transportStatus === "InTransit" || transportStatus === "OutForDelivery") currentStepIndex = 3
-  if (transportStatus === "Delivered") currentStepIndex = 4
+  if (transportStatus === "Pending") currentStepIndex = 2
+  if (transportStatus === "Processing") currentStepIndex = 3
+  if (transportStatus === "Success") currentStepIndex = 4
 
   return (
     <Card>

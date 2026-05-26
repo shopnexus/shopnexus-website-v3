@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import { useListRefunds } from "@/core/order/refund.buyer"
+import { useListBuyerRefunds } from "@/core/order/refund.buyer"
 import { RefundList } from "./_components/refund-list"
 
 export default function RefundsPage() {
@@ -11,7 +11,7 @@ export default function RefundsPage() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useListRefunds({ limit: 20 })
+  } = useListBuyerRefunds({ limit: 20 })
 
   const refunds = useMemo(() => {
     return refundsData?.pages.flatMap((page) => page.data) ?? []
